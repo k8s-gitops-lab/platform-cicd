@@ -8,12 +8,12 @@ REGISTRY_HOSTNAME  = registry.registry.svc.cluster.local
 REGISTRY_HOST      = $(REGISTRY_HOSTNAME):5000
 CORPORATE_CA_LABEL ?= Zscaler
 
-.PHONY: help bootstrap argocd-install argocd-wait argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-wait gitlab-password gitlab-url gitlab-status gitlab-runner-token gitlab-seed gitlab-agent-token gitlab-agent-status registry-wait registry-url argocd-repo-creds argocd-apps-render helloworld-status status
+.PHONY: help bootstrap argocd-install argocd-wait argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-wait gitlab-password gitlab-url gitlab-status gitlab-runner-token gitlab-seed registry-wait registry-url argocd-repo-creds argocd-apps-render helloworld-status status
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-bootstrap: argocd-install argocd-wait argocd-trust-corporate-ca argocd-bootstrap argocd-ingress gitlab-wait gitlab-runner-token gitlab-seed gitlab-agent-token registry-wait argocd-repo-creds ## Deploie la plateforme sur le contexte Kubernetes courant, sans creer de cluster
+bootstrap: argocd-install argocd-wait argocd-trust-corporate-ca argocd-bootstrap argocd-ingress gitlab-wait gitlab-runner-token gitlab-seed registry-wait argocd-repo-creds ## Deploie la plateforme sur le contexte Kubernetes courant, sans creer de cluster
 	@echo ""
 	@echo "Plateforme prete."
 	@echo "GitLab  : http://gitlab.$(GITLAB_DOMAIN)  (root / make gitlab-password)"
@@ -70,13 +70,6 @@ gitlab-runner-token: ## Cree le Secret K8s du token runner
 
 gitlab-seed: ## Cree/seed les projets GitLab declares dans argocd/apps.yaml
 	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=http://gitlab.$(GITLAB_DOMAIN) ./scripts/gitlab-seed.sh
-
-gitlab-agent-token: ## Enregistre l'agent Kubernetes GitLab et cree son Secret K8s
-	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=http://gitlab.$(GITLAB_DOMAIN) ./scripts/gitlab-agent-token.sh
-
-gitlab-agent-status: ## Affiche l'etat de l'agent GitLab
-	@kubectl -n $(ARGOCD_NAMESPACE) get application gitlab-agent
-	@kubectl -n gitlab-agent get pods
 
 registry-wait: ## Attend que le registry soit pret
 	kubectl -n $(REGISTRY_NAMESPACE) wait --for=condition=Available deployment/registry --timeout=120s

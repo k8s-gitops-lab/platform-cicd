@@ -18,9 +18,6 @@ dépôts ci-dessous omettent donc ce préfixe par souci de lisibilité.
   applications via des `Application`.
 - **GitLab** (chart Helm officiel, déployé en `Application` ArgoCD) : héberge
   le code et exécute les pipelines CI/CD via GitLab Runner (in-cluster).
-- **GitLab Agent for Kubernetes** (`agentk`) : connecte GitLab au cluster via
-  KAS pour activer le Kubernetes Dashboard GitLab sur les environnements, sans
-  remplacer ArgoCD comme moteur de déploiement GitOps.
 - **Registry Docker interne** (`registry:2`, déployé par ArgoCD) : stocke les
   images construites par la CI, sans dépendance à un registre externe.
 - **Add-ons réseau** (Traefik, Gateway API, MetalLB, Gateway partagée) :

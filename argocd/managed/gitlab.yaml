@@ -16,12 +16,13 @@ spec:
       # officiel, pour faire tourner GitLab sur un cluster k3d local mono-noeud.
       values: |
         global:
+          edition: ce
           kas:
-            enabled: true
+            enabled: false
+          registry:
+            enabled: false
           hosts:
             domain: 192.168.33.100.nip.io
-            kas:
-              name: kas.192.168.33.100.nip.io
             # Pas de TLS sur ce cluster local (pas de cert-manager) : sans ce flag,
             # le chart force `https: true` dans gitlab.yml, ce qui marque le cookie
             # de session "Secure" et le rend impossible à renvoyer en HTTP, faisant
@@ -29,14 +30,19 @@ spec:
             https: false
           ingress:
             enabled: false
-            class: ""
             configureCertmanager: false
           rails:
             bootsnap:
               enabled: false
+          appConfig:
+            defaultProjectsFeatures:
+              containerRegistry: false
+          webservice:
+            # Puma tue un worker après 60s par défaut ; sur ce cluster arm64
+            # mono-noeud, des requêtes lourdes (1er boot, imports) dépassent
+            # ce délai sous charge CPU contrainte sans être réellement bloquées.
+            workerTimeout: 120
         installCertmanager: false
-        certmanager-issuer:
-          email: admin@gitlab.local
         # ArgoCD exécute les hooks "pre-upgrade" dès le premier sync (il ne distingue
         # pas install vs upgrade comme le ferait `helm install`), ce qui fait échouer
         # ce job sur un cluster neuf faute de ConfigMap "chart-info" préexistante.
@@ -74,8 +80,6 @@ spec:
                   memory_limit = "1Gi"
         registry:
           enabled: false
-        gitlab-pages:
-          enabled: false
         # Le tag MinIO embarqué par le chart GitLab est très ancien et tire
         # une image non compatible arm64 sur Apple Silicon (exec format error).
         minio:
@@ -88,30 +92,35 @@ spec:
           webservice:
             minReplicas: 1
             maxReplicas: 1
-            resources:
-              requests:
-                cpu: 150m
-                memory: 1200Mi
-              limits:
-                memory: 2500Mi
+            deployment:
+              # >= workhorse.shutdownTimeout (workerTimeout+1=121s), avec marge.
+              terminationGracePeriodSeconds: 150
+              livenessProbe:
+                initialDelaySeconds: 60
+                timeoutSeconds: 30
+                failureThreshold: 5
+              readinessProbe:
+                initialDelaySeconds: 30
+                timeoutSeconds: 10
+                failureThreshold: 5
             workhorse:
               resources:
                 requests:
                   cpu: 50m
                   memory: 64Mi
+              livenessProbe:
+                initialDelaySeconds: 60
+                timeoutSeconds: 30
+                failureThreshold: 5
+              readinessProbe:
+                initialDelaySeconds: 30
+                timeoutSeconds: 10
+                failureThreshold: 5
           sidekiq:
             minReplicas: 1
             maxReplicas: 1
-            # 1Gi (valeur d'origine, inspirée de values-minikube-minimum.yaml) est
-            # trop juste pour sidekiq-ee : OOMKilled (137) systématique au boot,
-            # alors que webservice (même appli Rails) consomme ~2.7Gi en régime
-            # établi sur ce cluster.
-            resources:
-              requests:
-                cpu: 100m
-                memory: 768Mi
-              limits:
-                memory: 2Gi
+          gitlab-exporter:
+            enabled: false
           gitlab-shell:
             minReplicas: 1
             maxReplicas: 1

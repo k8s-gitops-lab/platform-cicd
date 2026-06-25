@@ -5,10 +5,6 @@ ciTemplate:
   ref: v0.11.0
   file: /gitlab-ci.yml
 
-agent:
-  projectPath: root/helloworld
-  name: poc-devops
-
 gitlab:
   # Constante de plateforme (même instance GitLab pour toutes les apps/services) --
   # un seul endroit, plutôt qu'un champ dupliqué par app comme avant.

@@ -13,13 +13,10 @@ sérialiser les commits GitOps concurrents. Les jobs continus dev sont
 `interruptible` afin qu'un nouveau merge dans `main` puisse annuler un build ou
 déploiement dev obsolète ; les jobs de release restent non interruptibles.
 
-Chaque environnement GitLab référence l'agent Kubernetes via la valeur
-exacte attendue par `GITLAB_K8S_AGENT` (`root/helloworld:poc-devops` —
-seul endroit où le préfixe `root/` reste écrit en toutes lettres dans cette
-doc, car c'est la syntaxe `<project_path>:<agent_name>` littéralement
-exigée par GitLab) et son namespace K8s (`helloworld-dev/rec/preprod/prod`)
-afin d'activer le Kubernetes Dashboard GitLab en complément d'ArgoCD. Le
-job `semantic-release` crée aussi une **Release GitLab** native pour `vX.Y.Z`
+Chaque environnement GitLab conserve son namespace K8s cible
+(`helloworld-dev/rec/preprod/prod`), mais le déploiement effectif reste piloté
+par ArgoCD via les commits GitOps sur le dépôt manifests. Le job
+`semantic-release` crée aussi une **Release GitLab** native pour `vX.Y.Z`
 (notes générées depuis les Conventional Commits par
 `@semantic-release/release-notes-generator`).
 
@@ -223,9 +220,8 @@ scripts versionnés :
 - `scripts/gitlab-seed.sh` crée/seede les projets applicatifs et manifests,
   génère les `.gitlab-ci.yml`, initialise les branches d'environnement et
   configure les protections GitLab.
-- `scripts/gitlab-runner-token.sh`, `scripts/gitlab-agent-token.sh` et
-  `scripts/argocd-repo-creds.sh` créent les secrets nécessaires sans action
-  UI.
+- `scripts/gitlab-runner-token.sh` et `scripts/argocd-repo-creds.sh` créent
+  les secrets nécessaires sans action UI.
 - `scripts/render-argocd-apps.rb` génère les `AppProject` et l'`ApplicationSet`
   depuis `argocd/apps.yaml`.
 - `argocd/managed/` déclare les add-ons plateforme applicative synchronisés par

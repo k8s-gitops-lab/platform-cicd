@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Seed GitLab depuis l'inventaire argocd/apps.yaml :
 # - root/ci-templates, tagué en version immuable pour les includes CI ;
-# - root/<app>-iac, un seul dépôt manifests par app, branches dev/rec/preprod?/main ;
-# - root/<app>, un dépôt de code par app, branche main unique,
-#   .gitlab-ci.yml généré depuis le template.
+# - root/<app>-iac et root/<app>, dépôts manifests/code par app -- pour ces
+#   deux-là, sourceDir est un dépôt git réel (cf. AGENTS.md), poussé via un
+#   remote "gitlab" dédié pour préserver son historique (pas de copie/réinit) ;
+#   le code reçoit en plus un .gitlab-ci.yml généré depuis le template.
 set -euo pipefail
 
 GITLAB_NAMESPACE="${GITLAB_NAMESPACE:-gitlab}"
 GITLAB_URL="${GITLAB_URL:-http://gitlab.192.168.33.100.nip.io}"
 GITLAB_ROOT_NAMESPACE="${GITLAB_ROOT_NAMESPACE:-root}"
+GITLAB_REMOTE_NAME="${GITLAB_REMOTE_NAME:-gitlab}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 APPS_FILE="${APPS_FILE:-$REPO_ROOT/argocd/apps.yaml}"
@@ -21,8 +23,6 @@ CI_TEMPLATE_PROJECT_NAME="${CI_TEMPLATE_PROJECT_NAME:-$(yaml_value ciTemplate.pr
 CI_TEMPLATE_SOURCE_DIR="${CI_TEMPLATE_SOURCE_DIR:-$REPO_ROOT/$(yaml_value ciTemplate.sourceDir)}"
 CI_TEMPLATE_REF="${CI_TEMPLATE_REF:-$(yaml_value ciTemplate.ref)}"
 CI_TEMPLATE_FILE="${CI_TEMPLATE_FILE:-$(yaml_value ciTemplate.file)}"
-AGENT_NAME="${AGENT_NAME:-$(yaml_value agent.name)}"
-AGENT_PROJECT_PATH="${AGENT_PROJECT_PATH:-$(yaml_value agent.projectPath)}"
 REGISTRY_HOST="${REGISTRY_HOST:-registry.registry.svc.cluster.local:5000}"
 INTERNAL_GITLAB_HOST="${INTERNAL_GITLAB_HOST:-$(yaml_value gitlab.internalHost)}"
 
@@ -70,9 +70,7 @@ ensure_project() {
 
 seed_project_from_dir() {
   local project_path="$1" source_dir="$2"
-  shift 2
-  local env_branches=("$@")
-  local workdir branch
+  local workdir
 
   echo "Poussée du contenu initial de '$source_dir' vers '$project_path'..."
   workdir=$(mktemp -d)
@@ -87,48 +85,32 @@ seed_project_from_dir() {
   git -C "$workdir" remote add origin "${GITLAB_SCHEME}://root:${ROOT_PASSWORD}@${GITLAB_HOST}/${project_path}.git"
   git -C "$workdir" push -q origin main
 
-  if [ "$#" -gt 0 ]; then
-    for branch in "$@"; do
-      git -C "$workdir" checkout -q -b "$branch" main
-      apply_manifests_env_overrides "$workdir" "$CURRENT_APP_NAME" "$branch" "$MANIFESTS_PATH"
-      git -C "$workdir" add -A
-      git -C "$workdir" commit -q -m "chore: overrides environnement ${branch} (${project_path})"
-      git -C "$workdir" push -q origin "$branch"
-    done
+  rm -rf "$workdir"
+  echo "Contenu initial poussé sur 'main' de '$project_path'."
+}
+
+# Pousse l'historique git réel d'un dépôt local (helloworld, helloworld-iac)
+# vers GitLab via un remote nommé dédié, plutôt que de recréer un historique
+# depuis une copie temporaire -- préserve l'historique de développement.
+# Le token d'auth passe par un header HTTP à la volée (-c http.extraheader)
+# pour ne jamais persister le mot de passe root dans le remote du dépôt réel.
+seed_project_from_repo() {
+  local project_path="$1" repo_dir="$2"
+  local remote_url branch
+
+  remote_url="${GITLAB_URL}/${project_path}.git"
+  echo "Poussée de l'historique de '$repo_dir' vers '$project_path' (remote '${GITLAB_REMOTE_NAME}')..."
+  if git -C "$repo_dir" remote get-url "$GITLAB_REMOTE_NAME" >/dev/null 2>&1; then
+    git -C "$repo_dir" remote set-url "$GITLAB_REMOTE_NAME" "$remote_url"
+  else
+    git -C "$repo_dir" remote add "$GITLAB_REMOTE_NAME" "$remote_url"
   fi
 
-  rm -rf "$workdir"
-  echo "Contenu initial poussé sur 'main' et $# branche(s) d'environnement de '$project_path'."
-}
-
-# Un repo manifests peut contenir plusieurs services (un par sous-ensemble de
-# 3 fichiers <service>-{deployment,service,route}.yaml) -- une URL par
-# (app, environnement, service), donc un sed par service plutôt qu'un seul
-# fichier de routage unique comme avant.
-apply_manifests_env_overrides() {
-  local dir="$1" app_name="$2" branch="$3" manifests_path="${4:-}"
-  local service_name route_host route_file ingress_file
-  while IFS=$'\t' read -r service_name route_host; do
-    route_file="$dir/${manifests_path:+$manifests_path/}${service_name}-route.yaml"
-    ingress_file="$dir/${manifests_path:+$manifests_path/}${service_name}-ingress.yaml"
-    if [ -f "$route_file" ]; then
-      # $route_host est déjà le FQDN complet (ex. helloworld-svc-dev.192.168.33.100.nip.io).
-      sed -i '' -E "s#^([[:space:]]*-[[:space:]]*)[A-Za-z0-9.-]+\\.nip\\.io#\\1${route_host}#" "$route_file"
-    elif [ -f "$ingress_file" ]; then
-      sed -i '' -E "s#^([[:space:]]*-?[[:space:]]*host:[[:space:]]*).*#\\1${route_host}#" "$ingress_file"
-    fi
-  done < <(service_hosts_for_branch "$app_name" "$branch")
-}
-
-service_hosts_for_branch() {
-  local app_name="$1" branch="$2"
-  ruby -ryaml -e '
-    app = YAML.load_file(ARGV.fetch(0)).fetch("apps").find { |a| a.fetch("name") == ARGV.fetch(1) }
-    env = app.fetch("environments").find { |e| e.fetch("branch") == ARGV.fetch(2) }
-    env.fetch("services").each do |svc|
-      puts [svc.fetch("name"), svc.fetch("ingressHost")].join("\t")
-    end
-  ' "$APPS_FILE" "$app_name" "$branch"
+  while IFS= read -r branch; do
+    git -C "$repo_dir" -c "http.extraheader=Authorization: Bearer ${BEARER_TOKEN}" \
+      push -q "$GITLAB_REMOTE_NAME" "refs/heads/${branch}:refs/heads/${branch}"
+  done < <(git -C "$repo_dir" for-each-ref --format='%(refname:short)' refs/heads/)
+  echo "Historique de '$repo_dir' poussé vers '$project_path'."
 }
 
 configure_main_gate() {
@@ -248,7 +230,7 @@ ensure_push_token_variable() {
 }
 
 render_app_ci() {
-  local app_name="$1" services="$2" showcase_service="$3" internal_gitlab_host="$4" manifests_project_path="$5" manifests_path="$6" has_preprod="$7" gitlab_k8s_agent="$8" out="$9"
+  local app_name="$1" services="$2" showcase_service="$3" internal_gitlab_host="$4" manifests_project_path="$5" manifests_path="$6" has_preprod="$7" out="$8"
   cat >"$out" <<EOF
 include:
   - project: ${CI_TEMPLATE_PROJECT_PATH}
@@ -266,42 +248,7 @@ variables:
   MANIFESTS_PROJECT_PATH: ${manifests_project_path}
   MANIFESTS_PATH: ${manifests_path}
   HAS_PREPROD: "${has_preprod}"
-  GITLAB_K8S_AGENT: ${gitlab_k8s_agent}
 EOF
-}
-
-render_agent_config() {
-  local code_project_path="$1" out="$2"
-  cat >"$out" <<EOF
-ci_access:
-  projects:
-    - id: ${code_project_path}
-
-user_access:
-  access_as:
-    agent: {}
-  projects:
-    - id: ${code_project_path}
-EOF
-}
-
-render_agent_config_all() {
-  local out="$1"
-  {
-    echo "ci_access:"
-    echo "  projects:"
-    read_app_code_inventory | while IFS=$'\t' read -r _app_name code_project_path _rest; do
-      echo "    - id: ${code_project_path}"
-    done
-    echo
-    echo "user_access:"
-    echo "  access_as:"
-    echo "    agent: {}"
-    echo "  projects:"
-    read_app_code_inventory | while IFS=$'\t' read -r _app_name code_project_path _rest; do
-      echo "    - id: ${code_project_path}"
-    done
-  } >"$out"
 }
 
 # Une ligne par app : pilote la création/seed du repo manifests partagé par
@@ -310,18 +257,12 @@ read_app_inventory() {
   ruby -ryaml -e '
     YAML.load_file(ARGV.fetch(0)).fetch("apps").each do |app|
       manifests = app.fetch("manifests")
-      env_branches = app.fetch("environments")
-        .reject { |env| env.fetch("branch") == "main" }
-        .map { |env| env.fetch("branch") }
-        .join(",")
       puts [
         app.fetch("name"),
         manifests.fetch("projectPath"),
         manifests.fetch("projectName"),
         manifests.fetch("sourceDir"),
-        manifests.fetch("mainPushAccessLevel"),
-        manifests.fetch("path"),
-        env_branches
+        manifests.fetch("mainPushAccessLevel")
       ].join("\t")
     end
   ' "$APPS_FILE"
@@ -346,11 +287,10 @@ read_app_code_inventory() {
         app.fetch("showcaseService"),
         manifests.fetch("projectPath"),
         manifests.fetch("path"),
-        app.fetch("hasPreprod"),
-        "#{code.fetch("projectPath")}:#{ARGV.fetch(1)}"
+        app.fetch("hasPreprod")
       ].join("\t")
     end
-  ' "$APPS_FILE" "$AGENT_NAME"
+  ' "$APPS_FILE"
 }
 
 read -r CI_TEMPLATE_EMPTY_REPO CI_TEMPLATE_PROJECT_ID <<<"$(ensure_project "$CI_TEMPLATE_PROJECT_PATH" "$CI_TEMPLATE_PROJECT_NAME")"
@@ -361,64 +301,42 @@ else
 fi
 ensure_project_tag "$CI_TEMPLATE_PROJECT_ID" "$CI_TEMPLATE_REF" main
 
-while IFS=$'\t' read -r APP_NAME MANIFESTS_PROJECT_PATH MANIFESTS_PROJECT_NAME MANIFESTS_SOURCE_DIR_REL MANIFESTS_PUSH_ACCESS MANIFESTS_PATH ENV_BRANCHES; do
-  CURRENT_APP_NAME="$APP_NAME"
+while IFS=$'\t' read -r APP_NAME MANIFESTS_PROJECT_PATH MANIFESTS_PROJECT_NAME MANIFESTS_SOURCE_DIR_REL MANIFESTS_PUSH_ACCESS; do
   MANIFESTS_SOURCE_DIR="$REPO_ROOT/${MANIFESTS_SOURCE_DIR_REL}"
 
-  if [ ! -d "$MANIFESTS_SOURCE_DIR" ]; then
-    echo "Source manifests introuvable : ${MANIFESTS_SOURCE_DIR}" >&2
+  if [ ! -d "$MANIFESTS_SOURCE_DIR/.git" ]; then
+    echo "Dépôt git manifests introuvable : ${MANIFESTS_SOURCE_DIR}" >&2
     exit 1
   fi
 
-  read -r MANIFESTS_EMPTY_REPO MANIFESTS_PROJECT_ID <<<"$(ensure_project "$MANIFESTS_PROJECT_PATH" "$MANIFESTS_PROJECT_NAME")"
-  if [ "$MANIFESTS_EMPTY_REPO" = "true" ]; then
-    IFS=',' read -r -a env_branches <<<"$ENV_BRANCHES"
-    seed_project_from_dir "$MANIFESTS_PROJECT_PATH" "$MANIFESTS_SOURCE_DIR" "${env_branches[@]}"
-  else
-    echo "Projet '$MANIFESTS_PROJECT_PATH' a déjà du contenu (empty_repo=false), aucun push effectué."
-  fi
+  read -r _MANIFESTS_EMPTY_REPO MANIFESTS_PROJECT_ID <<<"$(ensure_project "$MANIFESTS_PROJECT_PATH" "$MANIFESTS_PROJECT_NAME")"
+  seed_project_from_repo "$MANIFESTS_PROJECT_PATH" "$MANIFESTS_SOURCE_DIR"
   configure_main_gate "$MANIFESTS_PROJECT_ID" "$MANIFESTS_PUSH_ACCESS"
 done < <(read_app_inventory)
 
-while IFS=$'\t' read -r APP_NAME CODE_PROJECT_PATH CODE_PROJECT_NAME CODE_SOURCE_DIR_REL CODE_PUSH_ACCESS SERVICES SHOWCASE_SERVICE CI_MANIFESTS_PROJECT_PATH MANIFESTS_PATH HAS_PREPROD GITLAB_K8S_AGENT; do
+while IFS=$'\t' read -r APP_NAME CODE_PROJECT_PATH CODE_PROJECT_NAME CODE_SOURCE_DIR_REL CODE_PUSH_ACCESS SERVICES SHOWCASE_SERVICE CI_MANIFESTS_PROJECT_PATH MANIFESTS_PATH HAS_PREPROD; do
   CODE_SOURCE_DIR="$REPO_ROOT/${CODE_SOURCE_DIR_REL}"
 
-  if [ ! -d "$CODE_SOURCE_DIR" ]; then
-    echo "Source applicative introuvable : ${CODE_SOURCE_DIR}" >&2
+  if [ ! -d "$CODE_SOURCE_DIR/.git" ]; then
+    echo "Dépôt git applicatif introuvable : ${CODE_SOURCE_DIR}" >&2
     exit 1
   fi
 
-  read -r CODE_EMPTY_REPO CODE_PROJECT_ID <<<"$(ensure_project "$CODE_PROJECT_PATH" "$CODE_PROJECT_NAME")"
+  read -r _CODE_EMPTY_REPO CODE_PROJECT_ID <<<"$(ensure_project "$CODE_PROJECT_PATH" "$CODE_PROJECT_NAME")"
   ensure_push_token_variable "$CODE_PROJECT_ID" "$APP_NAME"
 
-  if [ "$CODE_EMPTY_REPO" = "true" ]; then
-    tmp_code=$(mktemp -d)
-    cp -R "$CODE_SOURCE_DIR"/. "$tmp_code"/
-    rm -rf "$tmp_code/.venv" "$tmp_code/.git"
-    render_app_ci "$APP_NAME" "$SERVICES" "$SHOWCASE_SERVICE" "$INTERNAL_GITLAB_HOST" "$CI_MANIFESTS_PROJECT_PATH" "$MANIFESTS_PATH" "$HAS_PREPROD" "$GITLAB_K8S_AGENT" "$tmp_code/.gitlab-ci.yml"
-    mkdir -p "$tmp_code/.gitlab/agents/${AGENT_NAME}"
-    render_agent_config "$CODE_PROJECT_PATH" "$tmp_code/.gitlab/agents/${AGENT_NAME}/config.yaml"
-    seed_project_from_dir "$CODE_PROJECT_PATH" "$tmp_code"
-    rm -rf "$tmp_code"
-    configure_main_gate "$CODE_PROJECT_ID" 0
-  else
-    echo "Projet '$CODE_PROJECT_PATH' a déjà du contenu (empty_repo=false), mise à jour des fichiers CI/agent uniquement."
-    tmp_ci=$(mktemp)
-    tmp_agent=$(mktemp)
-    render_app_ci "$APP_NAME" "$SERVICES" "$SHOWCASE_SERVICE" "$INTERNAL_GITLAB_HOST" "$CI_MANIFESTS_PROJECT_PATH" "$MANIFESTS_PATH" "$HAS_PREPROD" "$GITLAB_K8S_AGENT" "$tmp_ci"
-    render_agent_config "$CODE_PROJECT_PATH" "$tmp_agent"
-    ensure_repository_file_on_main_with_gate "$CODE_PROJECT_ID" ".gitlab-ci.yml" "$tmp_ci" "chore: include shared CI template" 0
-    ensure_repository_file_on_main_with_gate "$CODE_PROJECT_ID" ".gitlab/agents/${AGENT_NAME}/config.yaml" "$tmp_agent" "chore: configure GitLab Kubernetes agent" 0
-    rm -f "$tmp_ci" "$tmp_agent"
+  render_app_ci "$APP_NAME" "$SERVICES" "$SHOWCASE_SERVICE" "$INTERNAL_GITLAB_HOST" "$CI_MANIFESTS_PROJECT_PATH" "$MANIFESTS_PATH" "$HAS_PREPROD" "$CODE_SOURCE_DIR/.gitlab-ci.yml"
+
+  if [ -n "$(git -C "$CODE_SOURCE_DIR" status --porcelain -- .gitlab-ci.yml)" ]; then
+    echo "Commit du fichier CI GitLab dans le dépôt réel '${CODE_SOURCE_DIR}'..."
+    git -C "$CODE_SOURCE_DIR" add .gitlab-ci.yml
+    git -C "$CODE_SOURCE_DIR" commit -q -m "chore: configure CI GitLab"
   fi
+
+  seed_project_from_repo "$CODE_PROJECT_PATH" "$CODE_SOURCE_DIR"
+  configure_main_gate "$CODE_PROJECT_ID" 0
   # Gate deploy-prod/rollback-prod (cf. ci-templates/gitlab-ci.yml,
   # job environment: name: prod) au rôle Maintainer -- même limite que
   # configure_main_gate (pas de niveau "Owner" dédié côté API GitLab Free/Core).
   configure_protected_environment "$CODE_PROJECT_ID" "prod" 40
 done < <(read_app_code_inventory)
-
-read -r _AGENT_EMPTY_REPO AGENT_PROJECT_ID <<<"$(ensure_project "$AGENT_PROJECT_PATH" "${AGENT_PROJECT_PATH##*/}")"
-tmp_agent_config=$(mktemp)
-render_agent_config_all "$tmp_agent_config"
-ensure_repository_file_on_main_with_gate "$AGENT_PROJECT_ID" ".gitlab/agents/${AGENT_NAME}/config.yaml" "$tmp_agent_config" "chore: share GitLab Kubernetes agent with apps" 0
-rm -f "$tmp_agent_config"
