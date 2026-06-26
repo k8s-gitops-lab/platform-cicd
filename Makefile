@@ -1,7 +1,7 @@
 ARGOCD_NAMESPACE  ?= argocd
 ARGOCD_VERSION    ?= stable
 ARGOCD_INSTALL_URL = https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
-ARGOCD_INSTALL_FILTER = scripts/filter-argocd-install.rb
+ARGOCD_INSTALL_FILTER = scripts/filter-argocd-install.py
 GITLAB_NAMESPACE  ?= gitlab
 GITLAB_DOMAIN     ?= 192.168.33.100.nip.io
 REGISTRY_NAMESPACE ?= registry
@@ -9,7 +9,7 @@ REGISTRY_HOSTNAME  = registry.registry.svc.cluster.local
 REGISTRY_HOST      = $(REGISTRY_HOSTNAME):5000
 CORPORATE_CA_LABEL ?= Zscaler
 
-.PHONY: help bootstrap argocd-install argocd-wait argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-wait gitlab-password gitlab-url gitlab-status gitlab-runner-token gitlab-seed registry-wait registry-url argocd-repo-creds argocd-apps-render helloworld-status status
+.PHONY: help bootstrap argocd-install argocd-wait argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-wait gitlab-password gitlab-url gitlab-status gitlab-runner-token gitlab-seed registry-wait registry-url argocd-repo-creds argocd-apps-render init-project helloworld-status status
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -23,7 +23,7 @@ bootstrap: argocd-install argocd-wait argocd-trust-corporate-ca argocd-bootstrap
 
 argocd-install: ## Installe ArgoCD dans le cluster courant
 	kubectl create namespace $(ARGOCD_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
-	ruby $(ARGOCD_INSTALL_FILTER) "$(ARGOCD_INSTALL_URL)" | kubectl apply --server-side --force-conflicts -n $(ARGOCD_NAMESPACE) -f -
+	python3 $(ARGOCD_INSTALL_FILTER) "$(ARGOCD_INSTALL_URL)" | kubectl apply --server-side --force-conflicts -n $(ARGOCD_NAMESPACE) -f -
 
 argocd-wait: ## Attend que les pods ArgoCD soient prets
 	kubectl -n $(ARGOCD_NAMESPACE) wait --for=condition=Available deployment --all --timeout=180s
@@ -67,10 +67,10 @@ gitlab-status: ## Affiche l'etat GitLab
 	@kubectl -n $(GITLAB_NAMESPACE) get pods
 
 gitlab-runner-token: ## Cree le Secret K8s du token runner
-	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=http://gitlab.$(GITLAB_DOMAIN) ./scripts/gitlab-runner-token.sh
+	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=http://gitlab.$(GITLAB_DOMAIN) python3 ./scripts/gitlab-runner-token.py
 
 gitlab-seed: ## Cree/seed les projets GitLab declares dans argocd/apps.yaml
-	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=http://gitlab.$(GITLAB_DOMAIN) ./scripts/gitlab-seed.sh
+	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=http://gitlab.$(GITLAB_DOMAIN) python3 ./scripts/gitlab-seed.py
 
 registry-wait: ## Attend que le registry soit pret
 	sleep 5
@@ -81,10 +81,15 @@ registry-url: ## Affiche l'URL du registry
 	@echo "Cluster: $(REGISTRY_HOST)"
 
 argocd-repo-creds: ## Cree les credentials ArgoCD pour les repos manifests prives
-	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=http://gitlab.$(GITLAB_DOMAIN) ARGOCD_NAMESPACE=$(ARGOCD_NAMESPACE) ./scripts/argocd-repo-creds.sh
+	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=http://gitlab.$(GITLAB_DOMAIN) ARGOCD_NAMESPACE=$(ARGOCD_NAMESPACE) python3 ./scripts/argocd-repo-creds.py
 
 argocd-apps-render: ## Regenere l'ApplicationSet depuis argocd/apps.yaml
-	./scripts/render-argocd-apps.rb > argocd/managed/apps-appset.yaml
+	python3 ./scripts/render-argocd-apps.py > argocd/managed/apps-appset.yaml
+
+init-project: ## Ajoute/met a jour une app: make init-project CODE_REPO=../app IAC_REPO=../app-iac
+	@test -n "$(CODE_REPO)" || (echo "CODE_REPO est requis" >&2; exit 1)
+	@test -n "$(IAC_REPO)" || (echo "IAC_REPO est requis" >&2; exit 1)
+	./scripts/init-project.py "$(CODE_REPO)" "$(IAC_REPO)"
 
 helloworld-status: ## Affiche l'etat des Applications helloworld
 	@kubectl -n $(ARGOCD_NAMESPACE) get application helloworld-dev helloworld-rec helloworld-preprod helloworld-prod

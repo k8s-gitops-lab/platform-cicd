@@ -10,4 +10,4 @@ gitlab:
   # un seul endroit, plutôt qu'un champ dupliqué par app comme avant.
   internalHost: gitlab-webservice-default.gitlab.svc.cluster.local:8181
 
-apps: []
+appsDir: apps

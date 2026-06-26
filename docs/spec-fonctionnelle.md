@@ -126,7 +126,7 @@ Le parcours cible pour une app standard est volontairement court :
    et un `Dockerfile` par service.
 2. Ajouter le dépôt local de manifests GitOps de l'app, avec les manifests
    Kubernetes et un `kustomization.yaml` sous le chemin déclaré.
-3. Ajouter une entrée dans `argocd/apps.yaml` : nom de l'app, dépôt de code,
+3. Ajouter un fichier `argocd/apps/<app>.yaml` : nom de l'app, dépôt de code,
    dépôt manifests, services, images, environnements et option `hasPreprod`.
 4. Régénérer les Applications ArgoCD depuis l'inventaire.
 5. Seeder GitLab pour créer ou mettre à jour les projets, branches, variables
