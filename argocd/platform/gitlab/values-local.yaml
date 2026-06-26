@@ -34,7 +34,7 @@ global:
     # ce délai sous charge CPU contrainte sans être réellement bloquées.
     workerTimeout: 120
   minio:
-    enabled: false
+    enabled: true
   pages:
     objectStore:
       enabled: false
@@ -78,7 +78,7 @@ registry:
   enabled: false
 gitlab:
   migrations:
-    enabled: false
+    enabled: true
   webservice:
     minReplicas: 1
     maxReplicas: 1
