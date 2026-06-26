@@ -31,7 +31,7 @@ argocd-wait: ## Attend que les pods ArgoCD soient prets
 argocd-bootstrap: ## Applique le root Application ArgoCD
 	kubectl apply -n $(ARGOCD_NAMESPACE) -f argocd/root-app.yaml
 
-argocd-trust-corporate-ca: ## Fait confiance au CA corporate dans argocd-repo-server (macOS)
+argocd-trust-corporate-ca: ## Cree le ConfigMap CA corporate pour argocd-repo-server (macOS)
 	@tmpdir=$$(mktemp -d); \
 	security find-certificate -a -c "$(CORPORATE_CA_LABEL)" -p /Library/Keychains/System.keychain > $$tmpdir/corporate-ca.pem; \
 	repo_pod=$$(kubectl -n $(ARGOCD_NAMESPACE) get pods -l app.kubernetes.io/name=argocd-repo-server -o jsonpath='{.items[0].metadata.name}'); \
@@ -42,7 +42,7 @@ argocd-trust-corporate-ca: ## Fait confiance au CA corporate dans argocd-repo-se
 	kubectl -n $(ARGOCD_NAMESPACE) patch deployment argocd-repo-server --type strategic --patch-file argocd/repo-server-ca-patch.yaml
 	kubectl -n $(ARGOCD_NAMESPACE) rollout status deployment argocd-repo-server --timeout=120s
 
-argocd-ingress: ## Configure ArgoCD en HTTP pour la HTTPRoute argocd-ui
+argocd-ingress: ## Configure ArgoCD en HTTP (bootstrap uniquement ; server.insecure est ensuite maintenu par l'Application argocd-config)
 	kubectl -n $(ARGOCD_NAMESPACE) patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"server.insecure":"true"}}'
 	kubectl -n $(ARGOCD_NAMESPACE) rollout restart deployment argocd-server
 	kubectl -n $(ARGOCD_NAMESPACE) rollout status deployment argocd-server --timeout=120s
@@ -86,7 +86,7 @@ argocd-repo-creds: ## Cree les credentials ArgoCD pour les repos manifests prive
 argocd-apps-render: ## Regenere l'ApplicationSet depuis l'inventaire apps
 	python3 ./scripts/render-argocd-apps.py > argocd/managed/apps-appset.yaml
 
-init-project: ## Ajoute/met a jour une app: make init-project CODE_REPO=../app IAC_REPO=../app-iac
+init-project: ## Ajoute/met a jour une app: make init-project CODE_REPO=<url-ou-chemin> IAC_REPO=<url-ou-chemin>
 	@test -n "$(CODE_REPO)" || (echo "CODE_REPO est requis" >&2; exit 1)
 	@test -n "$(IAC_REPO)" || (echo "IAC_REPO est requis" >&2; exit 1)
 	./scripts/init-project.py "$(CODE_REPO)" "$(IAC_REPO)"

@@ -376,7 +376,7 @@ ensure_project_tag(ci_template_project_id, CI_TEMPLATE_REF, "main")
 for app in inventory["apps"]:
     manifests = app["manifests"]
     app_name = app["name"]
-    manifests_source_dir = REPO_ROOT / manifests["sourceDir"]
+    manifests_source_dir = REPO_ROOT / manifests["localPath"]
 
     if not (manifests_source_dir / ".git").is_dir():
         print(f"Dépôt git manifests introuvable : {manifests_source_dir}", file=sys.stderr)
@@ -396,7 +396,7 @@ for app in inventory["apps"]:
     code = app["code"]
     manifests = app["manifests"]
     app_name = app["name"]
-    code_source_dir = REPO_ROOT / code["sourceDir"]
+    code_source_dir = REPO_ROOT / code["localPath"]
 
     if not (code_source_dir / ".git").is_dir():
         print(f"Dépôt git applicatif introuvable : {code_source_dir}", file=sys.stderr)

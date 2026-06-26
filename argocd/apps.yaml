@@ -1,3 +1,10 @@
+platform:
+  domain: 192.168.33.100.nip.io
+  repoURL: https://github.com/elkouhen/poc-devops-platform.git
+  targetRevision: main
+  registry:
+    host: registry.registry.svc.cluster.local:5000
+
 ciTemplate:
   projectPath: root/ci-templates
   projectName: ci-templates
