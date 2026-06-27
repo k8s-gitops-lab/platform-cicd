@@ -138,7 +138,7 @@ sous-dossier) et le déploiement (plusieurs `kustomize edit set image`).
     argocd-apps-render`, à pousser sur `origin main`) et synchronisée en
     continu par le root Application "app of apps" (`argocd/root-app.yaml`,
     cf. "Point d'entrée" dans AGENTS.md). Une copie réutilisable existe aussi
-    dans `../poc-devops-toolbox/scripts/render-argocd-apps.py`, pilotable avec
+    dans `../toolbox/scripts/render-argocd-apps.py`, pilotable avec
     `PLATFORM_REPO_ROOT`.
   - **`gitlab-seed.py` généralisé** : boucle sur l'inventaire pour créer et
     seeder les dépôts `<app>`/`<app>-iac`, configurer les gates, et
@@ -222,13 +222,13 @@ Les scripts de bootstrap restent présents dans `scripts/` afin que
 depuis ce dépôt sans dépendre d'un repo frère.
 
 Une copie réutilisable de ces utilitaires a été extraite dans
-`../poc-devops-toolbox`. Cette toolbox sert aux autres projets ou aux appels
+`../toolbox`. Cette toolbox sert aux autres projets ou aux appels
 hors du dépôt plateforme. Les scripts y acceptent `PLATFORM_REPO_ROOT` pour
-pointer vers la racine `poc-devops-platform` :
+pointer vers la racine `platform-cicd` :
 
 ```sh
-PLATFORM_REPO_ROOT=/chemin/vers/poc-devops-platform \
-  python3 ../poc-devops-toolbox/scripts/render-argocd-apps.py
+PLATFORM_REPO_ROOT=/chemin/vers/platform-cicd \
+  python3 ../toolbox/scripts/render-argocd-apps.py
 ```
 
 Règle de maintenance : tant que le bootstrap plateforme dépend des scripts
@@ -244,7 +244,7 @@ La chaîne CI/CD principale (`make bootstrap`, GitLab, ArgoCD, registry,
 maintenant automatisée dans le dépôt.
 Les anciennes interventions manuelles de bootstrap ont été absorbées par les
 scripts versionnés localement, avec une copie partagée dans
-`../poc-devops-toolbox` :
+`../toolbox` :
 
 - `scripts/gitlab-seed.py` crée/seede les projets applicatifs et manifests,
   génère les `.gitlab-ci.yml`, initialise les branches d'environnement et

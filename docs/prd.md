@@ -45,7 +45,7 @@ Ajouter une app au pattern doit se résumer à ajouter un fichier d'app dans un
 inventaire déclaratif, pas à dupliquer de la logique CI/GitOps. Le mécanisme
 qui réalise cet objectif (repo `ci-templates`, index `argocd/apps.yaml`,
 fichiers `argocd/apps/*.yaml`, `ApplicationSet` ArgoCD, `gitlab-seed.py`
-généralisé et toolbox `poc-devops-toolbox`) est détaillé dans la spec
+généralisé et toolbox `toolbox`) est détaillé dans la spec
 technique.
 
 ## Expérience utilisateur cible

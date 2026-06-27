@@ -117,7 +117,7 @@ technique.
 Cf. "Objectif du scaling" dans le [PRD](./prd.md) pour le pourquoi. Le
 mécanisme (repo `ci-templates`, inventaire `argocd/apps.yaml` + `argocd/apps/*.yaml`,
 `ApplicationSet` ArgoCD, `gitlab-seed.py` généralisé et toolbox
-`poc-devops-toolbox`) est détaillé dans la
+`toolbox`) est détaillé dans la
 spec technique.
 
 ### Parcours fonctionnel : ajouter une application
