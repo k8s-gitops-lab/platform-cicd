@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitlab-iac-repo-creds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gitlab-iac-repo-creds-read
+  namespace: gitlab
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["gitlab-gitlab-initial-root-password"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitlab-iac-repo-creds-read
+  namespace: gitlab
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gitlab-iac-repo-creds-read
+subjects:
+  - kind: ServiceAccount
+    name: gitlab-iac-repo-creds
+    namespace: argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gitlab-iac-repo-creds-write
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["gitlab-helloworld-iac-repo"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitlab-iac-repo-creds-write
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gitlab-iac-repo-creds-write
+subjects:
+  - kind: ServiceAccount
+    name: gitlab-iac-repo-creds
+    namespace: argocd
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitlab-iac-repo-creds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: gitlab-iac-repo-creds
+      restartPolicy: Never
+      containers:
+        - name: create-secret
+          image: registry.gitlab.com/gitlab-org/build/cng/kubectl:v18.11.5
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              for i in $(seq 1 120); do
+                if kubectl -n gitlab get secret gitlab-gitlab-initial-root-password >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 5
+              done
+
+              password=$(
+                kubectl -n gitlab get secret gitlab-gitlab-initial-root-password \
+                  -o jsonpath='{.data.password}' | base64 -d
+              )
+
+              kubectl -n argocd create secret generic gitlab-helloworld-iac-repo \
+                --from-literal=type=git \
+                --from-literal=url=http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/helloworld-iac.git \
+                --from-literal=username=root \
+                --from-literal=password="$password" \
+                --dry-run=client -o yaml \
+                | kubectl -n argocd label -f - argocd.argoproj.io/secret-type=repository --local -o yaml \
+                | kubectl apply -f -
