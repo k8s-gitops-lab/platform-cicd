@@ -9,7 +9,7 @@ ciTemplate:
   projectPath: root/ci-templates
   projectName: ci-templates
   sourceDir: ../poc-devops-ci-templates
-  ref: v0.11.0
+  ref: v0.11.1
   file: /gitlab-ci.yml
 
 gitlab:
