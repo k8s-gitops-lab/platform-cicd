@@ -1,0 +1,193 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitlab-minio-patcher
+  namespace: gitlab
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gitlab-minio-patcher
+  namespace: gitlab
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["deletecollection", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitlab-minio-patcher
+  namespace: gitlab
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gitlab-minio-patcher
+subjects:
+  - kind: ServiceAccount
+    name: gitlab-minio-patcher
+    namespace: gitlab
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gitlab-minio-create-buckets-patch
+  namespace: gitlab
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: gitlab-minio-patcher
+      automountServiceAccountToken: true
+      restartPolicy: Never
+      containers:
+        - name: patch
+          image: minio/mc:RELEASE.2022-09-16T09-16-47Z
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              namespace=gitlab
+              configmap=gitlab-minio-config-cm
+              old='/usr/bin/mc policy $POLICY myminio/$BUCKET'
+              new='/usr/bin/mc policy set $POLICY myminio/$BUCKET'
+              api=https://kubernetes.default.svc
+              token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              auth="Authorization: Bearer $token"
+
+              get_configmap() {
+                curl -fsS --cacert "$ca" -H "$auth" \
+                  "$api/api/v1/namespaces/$namespace/configmaps/$configmap"
+              }
+
+              for i in $(seq 1 120); do
+                if get_configmap >/tmp/configmap.json 2>/dev/null; then
+                  break
+                fi
+                sleep 5
+              done
+
+              get_configmap >/tmp/configmap.json
+
+              if grep -Fq "$new" /tmp/configmap.json; then
+                echo "MinIO create-buckets script is already patched."
+              else
+                if ! grep -Fq "$old" /tmp/configmap.json; then
+                  echo "Expected MinIO policy command was not found." >&2
+                  exit 1
+                fi
+
+                cat >/tmp/initialize <<'EOF'
+              #!/bin/sh
+              # minio/mc container has Busybox Ash, be sure to be POSIX compliant and avoid Bash-isms
+              set -e ; # Have script exit in the event of a failed command.
+
+              # connectToMinio
+              # Use a check-sleep-check loop to wait for Minio service to be available
+              connectToMinio() {
+                set -e ; # fail if we can't read the keys.
+                ACCESS=$(cat /config/accesskey) ; SECRET=$(cat /config/secretkey) ;
+                set +e ; # The connections to minio are allowed to fail.
+                echo "Connecting to Minio server: http://$MINIO_ENDPOINT:$MINIO_PORT" ;
+                MC_COMMAND="mc config host add myminio http://$MINIO_ENDPOINT:$MINIO_PORT $ACCESS $SECRET" ;
+                $MC_COMMAND ;
+                STATUS=$? ;
+                until [ $STATUS -eq 0 ] ;
+                do
+                  sleep 1 ; # 1 second intervals between attempts
+                  $MC_COMMAND ;
+                  STATUS=$? ;
+                done ;
+                set -e ; # reset `e` as active
+                return 0
+              }
+
+              # checkBucketExists ($bucket)
+              # Check if the bucket exists, by using the exit code of `mc ls`
+              checkBucketExists() {
+                BUCKET=$1
+                CMD=$(/usr/bin/mc ls myminio/$BUCKET > /dev/null 2>&1)
+                return $?
+              }
+
+              # createBucket ($bucket, $policy, $purge)
+              # Ensure bucket exists, purging if asked to
+              createBucket() {
+                BUCKET=$1
+                POLICY=$2
+                PURGE=$3
+
+
+                # Purge the bucket, if set & exists
+                # Since PURGE is user input, check explicitly for `true`
+                if [ $PURGE = true ]; then
+                  if checkBucketExists $BUCKET ; then
+                    echo "Purging bucket '$BUCKET'."
+                    set +e ; # don't exit if this fails
+                    /usr/bin/mc rm -r --force myminio/$BUCKET
+                    set -e ; # reset `e` as active
+                  else
+                    echo "Bucket '$BUCKET' does not exist, skipping purge."
+                  fi
+                fi
+
+                # Create the bucket if it does not exist
+                if ! checkBucketExists $BUCKET ; then
+                  echo "Creating bucket '$BUCKET'"
+                  /usr/bin/mc mb myminio/$BUCKET
+                else
+                  echo "Bucket '$BUCKET' already exists."
+                fi
+
+                # At this point, the bucket should exist, skip checking for existance
+                # Set policy on the bucket
+                echo "Setting policy of bucket '$BUCKET' to '$POLICY'."
+                /usr/bin/mc policy set $POLICY myminio/$BUCKET
+              }
+
+              connectToMinio
+              createBucket registry none false
+              createBucket git-lfs none false
+              createBucket runner-cache none false
+              createBucket gitlab-uploads none false
+              createBucket gitlab-artifacts none false
+              createBucket gitlab-backups none false
+              createBucket gitlab-packages none false
+              createBucket tmp none false
+              createBucket gitlab-mr-diffs none false
+              createBucket gitlab-terraform-state none false
+              createBucket gitlab-ci-secure-files none false
+              createBucket gitlab-dependency-proxy none false
+              createBucket gitlab-pages none false
+              EOF
+
+                awk '
+                  BEGIN { printf "{\"data\":{\"initialize\":\"" }
+                  {
+                    gsub(/\\/, "\\\\")
+                    gsub(/"/, "\\\"")
+                    printf "%s%s", sep, $0
+                    sep = "\\n"
+                  }
+                  END { printf "\"}}" }
+                ' /tmp/initialize >/tmp/patch.json
+
+                curl -fsS --cacert "$ca" -H "$auth" \
+                  -H "Content-Type: application/merge-patch+json" \
+                  --request PATCH \
+                  --data-binary @/tmp/patch.json \
+                  "$api/api/v1/namespaces/$namespace/configmaps/$configmap" >/dev/null
+                echo "Patched MinIO create-buckets script."
+              fi
+
+              curl -fsS --cacert "$ca" -H "$auth" --request DELETE \
+                "$api/apis/batch/v1/namespaces/$namespace/jobs?labelSelector=app%3Dminio%2Crelease%3Dgitlab%2Cchart%3Dminio-0.4.3" \
+                >/dev/null
