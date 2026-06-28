@@ -63,6 +63,30 @@ def patch_argocd_secret(client_id, client_secret):
     )
 
 
+def trust_gitlab_application(app_id):
+    script = (
+        f"app = Doorkeeper::Application.find({int(app_id)}); "
+        "app.update!(trusted: true); "
+        "puts \"Application OAuth GitLab marquee trusted\""
+    )
+    subprocess.run(
+        [
+            "kubectl",
+            "-n",
+            GITLAB_NAMESPACE,
+            "exec",
+            "deploy/gitlab-webservice-default",
+            "-c",
+            "webservice",
+            "--",
+            "bash",
+            "-lc",
+            f"cd /srv/gitlab && bundle exec rails runner {json.dumps(script)}",
+        ],
+        check=True,
+    )
+
+
 def main():
     if has_argocd_dex_secret():
         print("argocd-secret contient deja dex.gitlab.clientID, skip.")
@@ -89,6 +113,7 @@ def main():
         "trusted": "true",
     }, token=auth["access_token"])
 
+    trust_gitlab_application(app["id"])
     patch_argocd_secret(app["application_id"], app["secret"])
     print(f"Application OAuth GitLab creee pour Dex: id={app['id']}")
 
