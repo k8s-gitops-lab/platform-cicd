@@ -9,6 +9,9 @@ REGISTRY_NAMESPACE ?= registry
 REGISTRY_HOSTNAME  = registry.registry.svc.cluster.local
 REGISTRY_HOST      = $(REGISTRY_HOSTNAME):5000
 CORPORATE_CA_LABEL ?= Zscaler
+GITOPS_REPO_ROOT   ?= ../platform-gitops
+GITOPS_APPS_FILE   = $(GITOPS_REPO_ROOT)/argocd/apps.yaml
+GITOPS_APPSET_FILE = $(GITOPS_REPO_ROOT)/argocd/managed/apps-appset.yaml
 
 .PHONY: help bootstrap argocd-install argocd-wait argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-wait gitlab-password gitlab-url gitlab-status gitlab-runner-token registry-wait registry-url argocd-apps-render check-generated init-project helloworld-status status
 
@@ -87,13 +90,13 @@ registry-url: ## Affiche l'URL du registry
 	@echo "Cluster: $(REGISTRY_HOST)"
 
 argocd-apps-render: ## Regenere l'ApplicationSet depuis l'inventaire apps
-	python3 ./scripts/render-argocd-apps.py > argocd/managed/apps-appset.yaml
+	APPS_FILE="$(GITOPS_APPS_FILE)" python3 ./scripts/render-argocd-apps.py > "$(GITOPS_APPSET_FILE)"
 
 check-generated: ## Verifie que les manifests generes sont a jour
 	@tmpfile=$$(mktemp); \
-	python3 ./scripts/render-argocd-apps.py > $$tmpfile; \
-	if ! cmp -s $$tmpfile argocd/managed/apps-appset.yaml; then \
-	  echo "argocd/managed/apps-appset.yaml n'est pas a jour. Lancez: make argocd-apps-render" >&2; \
+	APPS_FILE="$(GITOPS_APPS_FILE)" python3 ./scripts/render-argocd-apps.py > $$tmpfile; \
+	if ! cmp -s $$tmpfile "$(GITOPS_APPSET_FILE)"; then \
+	  echo "$(GITOPS_APPSET_FILE) n'est pas a jour. Lancez: make argocd-apps-render" >&2; \
 	  rm -f $$tmpfile; \
 	  exit 1; \
 	fi; \
@@ -102,7 +105,7 @@ check-generated: ## Verifie que les manifests generes sont a jour
 init-project: ## Ajoute/met a jour une app: make init-project CODE_REPO=<url-ou-chemin> IAC_REPO=<url-ou-chemin>
 	@test -n "$(CODE_REPO)" || (echo "CODE_REPO est requis" >&2; exit 1)
 	@test -n "$(IAC_REPO)" || (echo "IAC_REPO est requis" >&2; exit 1)
-	./scripts/init-project.py "$(CODE_REPO)" "$(IAC_REPO)"
+	APPS_FILE="$(GITOPS_APPS_FILE)" ./scripts/init-project.py "$(CODE_REPO)" "$(IAC_REPO)"
 
 helloworld-status: ## Affiche l'etat des Applications helloworld
 	@kubectl -n $(ARGOCD_NAMESPACE) get application helloworld-dev helloworld-rec helloworld-preprod helloworld-prod

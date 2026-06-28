@@ -11,7 +11,7 @@ from pathlib import Path
 from .common import env_bool, slug
 from .discover import find_kustomize_path, services_from_code, services_from_kustomization
 from .errors import fail
-from platform_inventory import load_inventory, platform_constants
+from platform_inventory import default_apps_file, load_inventory, platform_constants
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ def load_config(argv: list[str]) -> InitProjectConfig:
         fail(f"Usage: {argv[0]} <code-repo-url-ou-chemin> <iac-repo-url-ou-chemin>")
 
     repo_root = Path(__file__).resolve().parents[2]
-    apps_file = Path(os.environ.get("APPS_FILE", repo_root / "argocd/apps.yaml")).resolve()
+    apps_file = Path(os.environ.get("APPS_FILE", default_apps_file())).resolve()
 
     code_ref = argv[1]
     iac_ref = argv[2]

@@ -7,10 +7,9 @@ import os
 import yaml
 from pathlib import Path
 
-from platform_inventory import load_inventory, platform_constants
+from platform_inventory import default_apps_file, load_inventory, platform_constants
 
-repo_root = Path(__file__).parent.parent.resolve()
-inventory_path = os.environ.get("ARGOCD_APPS_FILE", str(repo_root / "argocd/apps.yaml"))
+inventory_path = os.environ.get("APPS_FILE") or os.environ.get("ARGOCD_APPS_FILE") or str(default_apps_file())
 
 inventory = load_inventory(Path(inventory_path))
 apps = inventory["apps"]

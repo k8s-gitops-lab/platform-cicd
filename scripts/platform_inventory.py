@@ -8,7 +8,7 @@ import yaml
 
 _PLATFORM_DEFAULTS = {
     "domain": "192.168.33.100.nip.io",
-    "repoURL": "https://github.com/elkouhen/poc-devops-platform.git",
+    "repoURL": "https://github.com/poc-devops-elkouhen/platform-gitops",
     "targetRevision": "main",
     "registry": {"host": "registry.registry.svc.cluster.local:5000"},
 }
@@ -17,7 +17,10 @@ _GITLAB_ROOT_NAMESPACE = "root"
 
 
 def default_apps_file() -> Path:
-    return Path(__file__).parent.parent.resolve() / "argocd/apps.yaml"
+    gitops_root = os.environ.get("GITOPS_REPO_ROOT")
+    if gitops_root:
+        return Path(gitops_root).resolve() / "argocd/apps.yaml"
+    return Path(__file__).parent.parent.resolve().parent / "platform-gitops/argocd/apps.yaml"
 
 
 def platform_constants(inventory: dict) -> dict:

@@ -1,7 +1,7 @@
 # Unique objet appliqué à la main (kubectl, une fois -- cf. `make argocd-bootstrap`) :
 # ArgoCD ne peut pas se "bootstrapper" lui-même depuis rien. Une fois synchronisé,
 # ce root Application ("app of apps") fait d'ArgoCD la source de vérité continue
-# pour tout argocd/managed/ -- GitLab, le registry, l'exposition HTTP d'ArgoCD
+# pour tout argocd/managed/ dans le depot GitOps -- GitLab, le registry, l'exposition HTTP d'ArgoCD
 # et les ApplicationSets applicatifs ajoutés dynamiquement. Les add-ons cluster
 # bas niveau (Gateway API, MetalLB, Traefik, Gateway partagée) sont provisionnés
 # par Ansible avant ArgoCD.
@@ -15,7 +15,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/elkouhen/poc-devops-platform.git
+    repoURL: https://github.com/poc-devops-elkouhen/platform-gitops
     targetRevision: main
     path: argocd/managed
   destination:
