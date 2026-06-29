@@ -86,6 +86,8 @@ def _normalize_app(app: dict, inventory: dict, pconst: dict) -> dict:
         manifests["mainPushAccessLevel"] = 40
     if "argocdSecretName" not in manifests:
         manifests["argocdSecretName"] = f"gitlab-{name}-iac-repo"
+    if "path" not in manifests:
+        manifests["path"] = "k8s"
     app["manifests"] = manifests
 
     # code: repoURL (user-facing, external GitLab) and localPath derived if absent

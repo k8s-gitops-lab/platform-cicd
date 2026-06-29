@@ -44,45 +44,49 @@ def kube_apply(cmd):
     subprocess.run(["kubectl", "apply", "-f", "-"], input=proc.stdout, check=True)
 
 
-# Idempotence : vérifier si le secret existe déjà avec un token non vide
-exists = subprocess.run(
-    ["kubectl", "-n", GITLAB_NAMESPACE, "get", "secret", SECRET_NAME],
-    capture_output=True,
-).returncode == 0
+def main() -> None:
+    exists = subprocess.run(
+        ["kubectl", "-n", GITLAB_NAMESPACE, "get", "secret", SECRET_NAME],
+        capture_output=True,
+    ).returncode == 0
 
-if exists:
-    existing_token = kube_secret_field(GITLAB_NAMESPACE, SECRET_NAME, "{.data.runner-token}")
-    if existing_token:
-        print(f"Secret '{SECRET_NAME}' déjà présent dans '{GITLAB_NAMESPACE}' avec un runner-token, rien à faire.")
-        sys.exit(0)
+    if exists:
+        existing_token = kube_secret_field(GITLAB_NAMESPACE, SECRET_NAME, "{.data.runner-token}")
+        if existing_token:
+            print(f"Secret '{SECRET_NAME}' déjà présent dans '{GITLAB_NAMESPACE}' avec un runner-token, rien à faire.")
+            return
 
-root_password = kube_secret_field(
-    GITLAB_NAMESPACE, "gitlab-gitlab-initial-root-password", "{.data.password}"
-)
+    root_password = kube_secret_field(
+        GITLAB_NAMESPACE, "gitlab-gitlab-initial-root-password", "{.data.password}"
+    )
 
-auth = gitlab_post("/oauth/token", {
-    "grant_type": "password",
-    "username": "root",
-    "password": root_password,
-})
-bearer_token = auth.get("access_token", "")
-if not bearer_token or bearer_token == "null":
-    print("Échec d'authentification à l'API GitLab", file=sys.stderr)
-    sys.exit(1)
+    auth = gitlab_post("/oauth/token", {
+        "grant_type": "password",
+        "username": "root",
+        "password": root_password,
+    })
+    bearer_token = auth.get("access_token", "")
+    if not bearer_token or bearer_token == "null":
+        print("Échec d'authentification à l'API GitLab", file=sys.stderr)
+        sys.exit(1)
 
-runner = gitlab_post("/api/v4/user/runners", {
-    "runner_type": "instance_type",
-    "description": "k3d-poc-devops",
-}, token=bearer_token)
-runner_token = runner.get("token", "")
-if not runner_token or runner_token == "null":
-    print("Échec de création du runner d'instance", file=sys.stderr)
-    sys.exit(1)
+    runner = gitlab_post("/api/v4/user/runners", {
+        "runner_type": "instance_type",
+        "description": "k3d-poc-devops",
+    }, token=bearer_token)
+    runner_token = runner.get("token", "")
+    if not runner_token or runner_token == "null":
+        print("Échec de création du runner d'instance", file=sys.stderr)
+        sys.exit(1)
 
-kube_apply([
-    "kubectl", "-n", GITLAB_NAMESPACE, "create", "secret", "generic", SECRET_NAME,
-    "--from-literal=runner-registration-token=",
-    f"--from-literal=runner-token={runner_token}",
-    "--dry-run=client", "-o", "yaml",
-])
-print(f"Secret '{SECRET_NAME}' créé avec un nouveau token d'instance runner.")
+    kube_apply([
+        "kubectl", "-n", GITLAB_NAMESPACE, "create", "secret", "generic", SECRET_NAME,
+        "--from-literal=runner-registration-token=",
+        f"--from-literal=runner-token={runner_token}",
+        "--dry-run=client", "-o", "yaml",
+    ])
+    print(f"Secret '{SECRET_NAME}' créé avec un nouveau token d'instance runner.")
+
+
+if __name__ == "__main__":
+    main()
