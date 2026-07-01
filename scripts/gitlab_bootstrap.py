@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import ssl
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -10,6 +12,28 @@ def ssl_context(insecure_tls: bool):
     if insecure_tls:
         return ssl._create_unverified_context()
     return None
+
+
+def wait_for_secret_field(
+    namespace: str,
+    name: str,
+    jsonpath: str,
+    timeout_seconds: int = 600,
+    interval_seconds: int = 5,
+) -> str:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        result = subprocess.run(
+            ["kubectl", "-n", namespace, "get", "secret", name, "-o", f"jsonpath={jsonpath}"],
+            capture_output=True,
+            text=True,
+        )
+        raw = result.stdout.strip()
+        if result.returncode == 0 and raw:
+            return base64.b64decode(raw).decode()
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"Secret '{name}' indisponible dans '{namespace}' apres {timeout_seconds}s")
+        time.sleep(interval_seconds)
 
 
 def wait_for_gitlab_ready(

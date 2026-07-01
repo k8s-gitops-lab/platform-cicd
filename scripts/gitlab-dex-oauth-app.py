@@ -5,7 +5,7 @@ import subprocess
 import urllib.parse
 import urllib.request
 
-from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready
+from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready, wait_for_secret_field
 
 
 GITLAB_NAMESPACE = os.environ.get("GITLAB_NAMESPACE", "gitlab")
@@ -70,12 +70,12 @@ def main():
         print("argocd-secret contient deja dex.gitlab.clientID, skip.")
         return
 
-    encoded_password = kube_secret_field(
+    password = wait_for_secret_field(
         GITLAB_NAMESPACE,
         "gitlab-gitlab-initial-root-password",
         "{.data.password}",
+        timeout_seconds=GITLAB_READY_TIMEOUT,
     )
-    password = subprocess.check_output(["base64", "-d"], input=encoded_password, text=True)
 
     auth = http_post("/oauth/token", {
         "grant_type": "password",

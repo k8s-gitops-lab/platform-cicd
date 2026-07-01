@@ -12,7 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready
+from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready, wait_for_secret_field
 
 GITLAB_NAMESPACE = os.environ.get("GITLAB_NAMESPACE", "gitlab")
 GITLAB_URL = os.environ.get("GITLAB_URL", "https://gitlab.192.168.33.100.nip.io")
@@ -61,8 +61,9 @@ def main() -> None:
             print(f"Secret '{SECRET_NAME}' déjà présent dans '{GITLAB_NAMESPACE}' avec un runner-token, rien à faire.")
             return
 
-    root_password = kube_secret_field(
-        GITLAB_NAMESPACE, "gitlab-gitlab-initial-root-password", "{.data.password}"
+    root_password = wait_for_secret_field(
+        GITLAB_NAMESPACE, "gitlab-gitlab-initial-root-password", "{.data.password}",
+        timeout_seconds=GITLAB_READY_TIMEOUT,
     )
 
     auth = gitlab_post("/oauth/token", {

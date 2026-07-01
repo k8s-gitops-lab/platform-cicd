@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from datetime import date, timedelta
 
-from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready
+from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready, wait_for_secret_field
 
 GITLAB_NAMESPACE = os.environ.get("GITLAB_NAMESPACE", "gitlab")
 FLUX_NAMESPACE = os.environ.get("FLUX_NAMESPACE", "flux-system")
@@ -72,10 +72,11 @@ def existing_token_is_valid() -> bool:
 
 
 def root_bearer_token() -> str:
-    root_password = kube_secret_field(
+    root_password = wait_for_secret_field(
         GITLAB_NAMESPACE,
         "gitlab-gitlab-initial-root-password",
         "{.data.password}",
+        timeout_seconds=GITLAB_READY_TIMEOUT,
     )
     auth = http_json(
         "/oauth/token",

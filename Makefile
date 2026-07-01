@@ -1,3 +1,6 @@
+SHELL := /bin/bash -e -o pipefail
+.SHELLFLAGS := -e -o pipefail -c
+
 ARGOCD_NAMESPACE  ?= argocd
 ARGOCD_VERSION    ?= v3.4.4
 ARGOCD_WAIT_TIMEOUT ?= 600s
