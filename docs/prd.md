@@ -56,12 +56,12 @@ Aucune duplication de logique CI, aucune configuration ArgoCD manuelle.
 ## Critères d'acceptation du POC
 
 - `make bootstrap` depuis ce dépôt déploie la plateforme complète sur un
-  cluster vierge.
+  cluster vierge, sans configuration applicative préchargée.
 - GitLab est accessible sur `https://gitlab.<domaine>`.
 - ArgoCD est accessible sur `https://argocd.<domaine>` avec SSO GitLab.
 - Le registry est accessible sur `http://registry.<domaine>`.
-- Un pipeline `helloworld` complet (build → dev → rec → prod) s'exécute sans
-  intervention manuelle hormis les gates de promotion.
+- Après onboarding applicatif, un pipeline complet (build → dev → rec → prod)
+  s'exécute sans intervention manuelle hormis les gates de promotion.
 
 ## Limites acceptées (non-objectifs du POC)
 

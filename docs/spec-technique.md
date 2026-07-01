@@ -9,7 +9,7 @@ argocd/
   dex-ca-patch.yaml          Patch strategic merge pour le CA Gateway
 scripts/
   platform_inventory.py      Modèle historique d'inventaire apps
-  render-argocd-apps.py      Déprécié : apps maintenues sous argocd/apps/<app>/
+  render-argocd-apps.py      Génère les manifests ArgoCD depuis argocd/apps/<app>/app.yaml
   filter-argocd-install.py   Filtre le manifest ArgoCD (retire notifications)
   gitlab-dex-oauth-app.py    Crée l'app OAuth GitLab pour Dex
   gitlab-runner-token.py     Crée le token runner et le Secret K8s
@@ -20,11 +20,18 @@ requirements.txt             pyyaml
 
 ## Ressources applicatives
 
-Les ressources propres aux applications sont regroupées sous
-`platform-gitops/argocd/apps/<app>/`. Les scripts historiques d'inventaire
-applicatif sont conservés uniquement comme garde-fous : `render-argocd-apps.py`
-et `init-project.py` échouent explicitement pour empêcher la recréation de
-l'ancien inventaire plat.
+Les ressources propres aux applications sont décrites sous
+`platform-gitops/argocd/apps/<app>/app.yaml`. `render-argocd-apps.py` lit ces
+descriptions, normalise les conventions via `platform_inventory.py`, puis écrit :
+
+- `platform-gitops/argocd/generated/apps/<app>/app-project.yaml` ;
+- `platform-gitops/argocd/generated/apps/<app>/applicationset.yaml` ;
+- `platform-gitops/argocd/generated/apps/<app>/repo-creds.yaml` ;
+- `platform-gitops/argocd/generated/apps/<app>/kustomization.yaml` ;
+- `platform-gitops/argocd/managed/apps-appset.yaml`.
+
+`make check-generated` exécute le générateur en mode comparaison et échoue si
+les fichiers committés ne correspondent plus aux descriptions `app.yaml`.
 
 ## `filter-argocd-install.py` — filtre ArgoCD
 

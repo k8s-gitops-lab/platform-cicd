@@ -9,11 +9,10 @@ CORPORATE_CA_LABEL ?= Zscaler
 GITOPS_REPO_ROOT   ?= ../platform-gitops
 GITOPS_APPS_FILE   = $(GITOPS_REPO_ROOT)/argocd/apps.yaml
 GITOPS_APPSET_FILE = $(GITOPS_REPO_ROOT)/argocd/managed/apps-appset.yaml
-APP_GITOPS_MSG = Les ressources applicatives doivent etre regroupees sous platform-gitops/argocd/apps/<app>/.
 FLUX_NAMESPACE    ?= flux-system
 SOPS_AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
 
-.PHONY: help bootstrap argocd-install argocd-wait argocd-bootstrap argocd-trust-corporate-ca argocd-trust-local-gateway-ca argocd-ingress argocd-url argocd-password gitlab-wait gitlab-password gitlab-url gitlab-status gitlab-dex-oauth-app gitlab-runner-token argocd-apps-render check-generated init-project helloworld-status status flux-sops-age
+.PHONY: help bootstrap argocd-install argocd-wait argocd-bootstrap argocd-trust-corporate-ca argocd-trust-local-gateway-ca argocd-ingress argocd-url argocd-password gitlab-wait gitlab-password gitlab-url gitlab-status gitlab-dex-oauth-app gitlab-runner-token argocd-apps-render check-generated init-project status flux-sops-age
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -97,18 +96,14 @@ gitlab-runner-token: ## Cree le Secret K8s du token runner
 	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=https://gitlab.$(GITLAB_DOMAIN) python3 ./scripts/gitlab-runner-token.py
 
 
-argocd-apps-render: ## Deprecated: utiliser argocd/apps/<app>/ directement
-	@echo "$(APP_GITOPS_MSG)" >&2
-	@exit 1
+argocd-apps-render: ## Genere les manifests ArgoCD depuis argocd/apps/<app>/app.yaml
+	APPS_FILE="$(GITOPS_APPS_FILE)" python3 ./scripts/render-argocd-apps.py
 
-check-generated: ## Verifie que l'ApplicationSet generique apps existe
-	@if [ ! -f "$(GITOPS_APPSET_FILE)" ]; then \
-	  echo "$(GITOPS_APPSET_FILE) est requis pour pointer vers argocd/apps/*" >&2; \
-	  exit 1; \
-	fi
+check-generated: ## Verifie que les manifests apps generes sont a jour
+	APPS_FILE="$(GITOPS_APPS_FILE)" python3 ./scripts/render-argocd-apps.py --check
 
 init-project: ## Deprecated: creer argocd/apps/<app>/ directement
-	@echo "$(APP_GITOPS_MSG)" >&2
+	@echo "Creer argocd/apps/<app>/app.yaml puis lancer make argocd-apps-render." >&2
 	@exit 1
 
 flux-sops-age: ## Injecte la cle age privee dans flux-system pour le dechiffrement SOPS (bootstrap uniquement)
@@ -120,9 +115,6 @@ flux-sops-age: ## Injecte la cle age privee dans flux-system pour le dechiffreme
 	  --from-file=age.agekey="$(SOPS_AGE_KEY_FILE)" \
 	  --dry-run=client -o yaml \
 	  | kubectl apply -f -
-
-helloworld-status: ## Affiche l'etat des Applications helloworld
-	@kubectl -n $(ARGOCD_NAMESPACE) get application app-config-helloworld helloworld-dev helloworld-rec helloworld-preprod helloworld-prod
 
 status: ## Affiche l'etat des Applications ArgoCD
 	@kubectl -n $(ARGOCD_NAMESPACE) get applications

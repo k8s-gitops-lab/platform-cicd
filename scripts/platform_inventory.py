@@ -43,7 +43,8 @@ def load_inventory(apps_file: Path | None = None) -> dict:
 
     pconst = platform_constants(inventory)
     apps = []
-    for app_file in sorted(apps_dir.glob("*.yaml")):
+    app_files = sorted(apps_dir.glob("*.yaml")) + sorted(apps_dir.glob("*/app.yaml"))
+    for app_file in app_files:
         with open(app_file) as f:
             app = yaml.safe_load(f) or {}
         if app:

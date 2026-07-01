@@ -26,13 +26,14 @@ atteint avant d'agir. `make bootstrap` exécute dans l'ordre :
 ## Ressources applicatives
 
 Les Applications, ApplicationSets, AppProjects, namespaces et credentials propres
-aux applications ne sont plus générés dans `argocd/managed/`. Ils sont regroupés
-par application sous `platform-gitops/argocd/apps/<app>/`.
+aux applications ne sont plus écrits à la main. Ils sont générés par application
+sous `platform-gitops/argocd/generated/apps/<app>/` à partir de
+`platform-gitops/argocd/apps/<app>/app.yaml`.
 
-`make check-generated` vérifie que l'ApplicationSet générique
-`platform-gitops/argocd/managed/apps-appset.yaml` existe pour pointer vers
-`argocd/apps/*`. Les cibles historiques `argocd-apps-render` et `init-project`
-échouent explicitement pour éviter de recréer l'ancien inventaire plat.
+`make argocd-apps-render` régénère ces manifests et l'ApplicationSet générique
+`platform-gitops/argocd/managed/apps-appset.yaml`, qui pointe vers
+`argocd/generated/apps/*`. `make check-generated` vérifie que les fichiers
+committés sont à jour.
 
 ## SSO GitLab → ArgoCD (Dex)
 
