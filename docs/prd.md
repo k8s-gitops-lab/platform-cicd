@@ -44,7 +44,8 @@ application :
 ## Objectif de scaling
 
 Ajouter une application doit se limiter à :
-- déclarer un fichier `argocd/apps/<app>.yaml` dans `platform-gitops` ;
+- créer un dossier `argocd/apps/<app>/` dans `platform-gitops` avec la
+  configuration GitOps dédiée ;
 - exécuter `make gitlab-seed` depuis `toolbox`.
 
 Aucune duplication de logique CI, aucune configuration ArgoCD manuelle.

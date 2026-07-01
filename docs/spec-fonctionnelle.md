@@ -23,19 +23,16 @@ atteint avant d'agir. `make bootstrap` exécute dans l'ordre :
    dans `gitlab-gitlab-runner-secret`. Idempotent.
 10. **`registry-wait`** — Attend que le déploiement `registry` soit `Available`.
 
-## Génération des Applications ArgoCD
+## Ressources applicatives
 
-`make argocd-apps-render` lit l'inventaire `platform-gitops/argocd/apps.yaml` +
-`argocd/apps/*.yaml` via `platform_inventory.py` et produit
-`platform-gitops/argocd/managed/apps-appset.yaml`.
+Les Applications, ApplicationSets, AppProjects, namespaces et credentials propres
+aux applications ne sont plus générés dans `argocd/managed/`. Ils sont regroupés
+par application sous `platform-gitops/argocd/apps/<app>/`.
 
-Ce fichier contient :
-- Un `AppProject` par application (restreint aux namespaces et dépôts de l'app).
-- Un `ApplicationSet` global avec un générateur `list` (une entrée par
-  couple `<app>/<env>`).
-
-`make check-generated` vérifie que le fichier committé est à jour. Ce check
-doit passer en CI avant tout merge sur `main`.
+`make check-generated` vérifie que l'ApplicationSet générique
+`platform-gitops/argocd/managed/apps-appset.yaml` existe pour pointer vers
+`argocd/apps/*`. Les cibles historiques `argocd-apps-render` et `init-project`
+échouent explicitement pour éviter de recréer l'ancien inventaire plat.
 
 ## SSO GitLab → ArgoCD (Dex)
 

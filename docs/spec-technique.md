@@ -8,37 +8,23 @@ argocd/
   repo-server-ca-patch.yaml  Patch strategic merge pour le CA corporate
   dex-ca-patch.yaml          Patch strategic merge pour le CA Gateway
 scripts/
-  platform_inventory.py      Chargement et normalisation de l'inventaire apps
-  render-argocd-apps.py      Génère AppProject + ApplicationSet depuis l'inventaire
+  platform_inventory.py      Modèle historique d'inventaire apps
+  render-argocd-apps.py      Déprécié : apps maintenues sous argocd/apps/<app>/
   filter-argocd-install.py   Filtre le manifest ArgoCD (retire notifications)
   gitlab-dex-oauth-app.py    Crée l'app OAuth GitLab pour Dex
   gitlab-runner-token.py     Crée le token runner et le Secret K8s
-  init-project.py            Onboarding d'une app (délègue à init_projects/)
+  init-project.py            Déprécié : onboarding app manuel sous argocd/apps/<app>/
 Makefile
 requirements.txt             pyyaml
 ```
 
-## `platform_inventory.py` — modèle de données
+## Ressources applicatives
 
-Ce module est **partagé** avec `toolbox/scripts/platform_inventory.py`. Les deux
-copies doivent rester synchronisées.
-
-`load_inventory(apps_file)` :
-1. Charge `argocd/apps.yaml` (métadonnées plateforme + `appsDir`).
-2. Si `apps:` est absent, charge chaque `argocd/apps/*.yaml`.
-3. Normalise chaque app via `_normalize_app()` : dérive par convention
-   `manifests.projectPath`, `manifests.argocdRepoURL`, `manifests.path` (défaut: `k8s`),
-   `code.projectPath`, `environments`, `showcaseService`, `argocd`.
-
-## `render-argocd-apps.py` — générateur ApplicationSet
-
-Lit l'inventaire et produit un document YAML multi-documents :
-- Un `AppProject` par app (whitelist `Namespace` pour `CreateNamespace=true`).
-- Un `ApplicationSet` unique avec un générateur `list` contenant toutes les
-  combinaisons `<app>/<env>`.
-
-La sortie est écrite dans `platform-gitops/argocd/managed/apps-appset.yaml` via
-une redirection shell (`make argocd-apps-render`).
+Les ressources propres aux applications sont regroupées sous
+`platform-gitops/argocd/apps/<app>/`. Les scripts historiques d'inventaire
+applicatif sont conservés uniquement comme garde-fous : `render-argocd-apps.py`
+et `init-project.py` échouent explicitement pour empêcher la recréation de
+l'ancien inventaire plat.
 
 ## `filter-argocd-install.py` — filtre ArgoCD
 

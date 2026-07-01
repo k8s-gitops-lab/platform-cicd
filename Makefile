@@ -9,6 +9,7 @@ CORPORATE_CA_LABEL ?= Zscaler
 GITOPS_REPO_ROOT   ?= ../platform-gitops
 GITOPS_APPS_FILE   = $(GITOPS_REPO_ROOT)/argocd/apps.yaml
 GITOPS_APPSET_FILE = $(GITOPS_REPO_ROOT)/argocd/managed/apps-appset.yaml
+APP_GITOPS_MSG = Les ressources applicatives doivent etre regroupees sous platform-gitops/argocd/apps/<app>/.
 FLUX_NAMESPACE    ?= flux-system
 SOPS_AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
 
@@ -96,23 +97,19 @@ gitlab-runner-token: ## Cree le Secret K8s du token runner
 	GITLAB_NAMESPACE=$(GITLAB_NAMESPACE) GITLAB_URL=https://gitlab.$(GITLAB_DOMAIN) python3 ./scripts/gitlab-runner-token.py
 
 
-argocd-apps-render: ## Regenere l'ApplicationSet depuis l'inventaire apps
-	APPS_FILE="$(GITOPS_APPS_FILE)" python3 ./scripts/render-argocd-apps.py > "$(GITOPS_APPSET_FILE)"
+argocd-apps-render: ## Deprecated: utiliser argocd/apps/<app>/ directement
+	@echo "$(APP_GITOPS_MSG)" >&2
+	@exit 1
 
-check-generated: ## Verifie que les manifests generes sont a jour
-	@tmpfile=$$(mktemp); \
-	APPS_FILE="$(GITOPS_APPS_FILE)" python3 ./scripts/render-argocd-apps.py > $$tmpfile; \
-	if ! cmp -s $$tmpfile "$(GITOPS_APPSET_FILE)"; then \
-	  echo "$(GITOPS_APPSET_FILE) n'est pas a jour. Lancez: make argocd-apps-render" >&2; \
-	  rm -f $$tmpfile; \
+check-generated: ## Verifie que l'ApplicationSet generique apps existe
+	@if [ ! -f "$(GITOPS_APPSET_FILE)" ]; then \
+	  echo "$(GITOPS_APPSET_FILE) est requis pour pointer vers argocd/apps/*" >&2; \
 	  exit 1; \
-	fi; \
-	rm -f $$tmpfile
+	fi
 
-init-project: ## Ajoute/met a jour une app: make init-project CODE_REPO=<url-ou-chemin> IAC_REPO=<url-ou-chemin>
-	@test -n "$(CODE_REPO)" || (echo "CODE_REPO est requis" >&2; exit 1)
-	@test -n "$(IAC_REPO)" || (echo "IAC_REPO est requis" >&2; exit 1)
-	APPS_FILE="$(GITOPS_APPS_FILE)" ./scripts/init-project.py "$(CODE_REPO)" "$(IAC_REPO)"
+init-project: ## Deprecated: creer argocd/apps/<app>/ directement
+	@echo "$(APP_GITOPS_MSG)" >&2
+	@exit 1
 
 flux-sops-age: ## Injecte la cle age privee dans flux-system pour le dechiffrement SOPS (bootstrap uniquement)
 	@test -f "$(SOPS_AGE_KEY_FILE)" || (echo "SOPS_AGE_KEY_FILE=$(SOPS_AGE_KEY_FILE) introuvable" >&2; exit 1)
@@ -125,7 +122,7 @@ flux-sops-age: ## Injecte la cle age privee dans flux-system pour le dechiffreme
 	  | kubectl apply -f -
 
 helloworld-status: ## Affiche l'etat des Applications helloworld
-	@kubectl -n $(ARGOCD_NAMESPACE) get application helloworld-dev helloworld-rec helloworld-preprod helloworld-prod
+	@kubectl -n $(ARGOCD_NAMESPACE) get application app-config-helloworld helloworld-dev helloworld-rec helloworld-preprod helloworld-prod
 
 status: ## Affiche l'etat des Applications ArgoCD
 	@kubectl -n $(ARGOCD_NAMESPACE) get applications
