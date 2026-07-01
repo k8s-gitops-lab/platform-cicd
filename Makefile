@@ -10,7 +10,6 @@ GITLAB_DOMAIN     ?= 192.168.33.100.nip.io
 CORPORATE_CA_LABEL ?= Zscaler
 GITOPS_REPO_ROOT   ?= ../platform-gitops
 GITOPS_APPS_FILE   = $(GITOPS_REPO_ROOT)/argocd/apps.yaml
-GITOPS_APPSET_FILE = $(GITOPS_REPO_ROOT)/argocd/managed/apps-appset.yaml
 FLUX_NAMESPACE    ?= flux-system
 SOPS_AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
 START_AT ?=
