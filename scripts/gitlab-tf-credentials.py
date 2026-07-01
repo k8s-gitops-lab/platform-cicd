@@ -4,7 +4,6 @@
 import base64
 import json
 import os
-import ssl
 import subprocess
 import sys
 import urllib.error
@@ -12,19 +11,16 @@ import urllib.parse
 import urllib.request
 from datetime import date, timedelta
 
+from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready
+
 GITLAB_NAMESPACE = os.environ.get("GITLAB_NAMESPACE", "gitlab")
 FLUX_NAMESPACE = os.environ.get("FLUX_NAMESPACE", "flux-system")
 GITLAB_URL = os.environ.get("GITLAB_URL", "https://gitlab.192.168.33.100.nip.io").rstrip("/")
 GITLAB_INSECURE_TLS = os.environ.get("GITLAB_INSECURE_TLS", "true").lower() not in ("0", "false", "no")
+GITLAB_READY_TIMEOUT = int(os.environ.get("GITLAB_READY_TIMEOUT", "600"))
 SECRET_NAME = os.environ.get("SECRET_NAME", "gitlab-tf-credentials")
 PAT_NAME = os.environ.get("PAT_NAME", "terraform-controller")
 PAT_SCOPES = ["api", "read_repository", "write_repository"]
-
-
-def ssl_context():
-    if GITLAB_INSECURE_TLS:
-        return ssl._create_unverified_context()
-    return None
 
 
 def kube_secret_field(namespace: str, name: str, jsonpath: str) -> str:
@@ -55,7 +51,7 @@ def http_json(path: str, method: str = "GET", data: dict | None = None, token: s
         body = urllib.parse.urlencode(data, doseq=True).encode()
         headers["Content-Type"] = "application/x-www-form-urlencoded"
     request = urllib.request.Request(f"{GITLAB_URL}{path}", data=body, headers=headers, method=method)
-    with urllib.request.urlopen(request, context=ssl_context(), timeout=30) as response:
+    with urllib.request.urlopen(request, context=ssl_context(GITLAB_INSECURE_TLS), timeout=30) as response:
         payload = response.read()
         if not payload:
             return None
@@ -154,6 +150,7 @@ def apply_secret(token: str) -> None:
 
 
 def main() -> None:
+    wait_for_gitlab_ready(GITLAB_URL, ssl_context(GITLAB_INSECURE_TLS), GITLAB_READY_TIMEOUT)
     if existing_token_is_valid():
         print(f"Secret '{SECRET_NAME}' déjà présent dans '{FLUX_NAMESPACE}' avec un token GitLab valide.")
         return

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import json
 import os
-import ssl
 import subprocess
 import urllib.parse
 import urllib.request
+
+from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready
 
 
 GITLAB_NAMESPACE = os.environ.get("GITLAB_NAMESPACE", "gitlab")
@@ -12,6 +13,7 @@ ARGOCD_NAMESPACE = os.environ.get("ARGOCD_NAMESPACE", "argocd")
 GITLAB_URL = os.environ.get("GITLAB_URL", "https://gitlab.192.168.33.100.nip.io").rstrip("/")
 ARGOCD_URL = os.environ.get("ARGOCD_URL", "https://argocd.192.168.33.100.nip.io").rstrip("/")
 TLS_VERIFY = os.environ.get("GITLAB_TLS_VERIFY", "false").lower() not in ("0", "false", "no")
+GITLAB_READY_TIMEOUT = int(os.environ.get("GITLAB_READY_TIMEOUT", "600"))
 
 
 def kube_secret_field(namespace, name, jsonpath):
@@ -34,8 +36,7 @@ def http_post(path, data, token=None):
     if token:
         headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(f"{GITLAB_URL}{path}", data=body, headers=headers)
-    context = None if TLS_VERIFY else ssl._create_unverified_context()
-    with urllib.request.urlopen(request, context=context, timeout=30) as response:
+    with urllib.request.urlopen(request, context=ssl_context(not TLS_VERIFY), timeout=30) as response:
         return json.load(response)
 
 
@@ -64,6 +65,7 @@ def patch_argocd_secret(client_id, client_secret):
 
 
 def main():
+    wait_for_gitlab_ready(GITLAB_URL, ssl_context(not TLS_VERIFY), GITLAB_READY_TIMEOUT)
     if has_argocd_dex_secret():
         print("argocd-secret contient deja dex.gitlab.clientID, skip.")
         return

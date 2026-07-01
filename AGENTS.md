@@ -16,6 +16,7 @@ effectué, ArgoCD gère la plateforme en continu depuis `platform-gitops`.
 
 ```bash
 make bootstrap              # Bootstrap complet (ArgoCD + GitLab + registry)
+make bootstrap START_AT=gitlab-tf-credentials # Reprendre le bootstrap à une étape
 make argocd-install         # Installer ArgoCD seul
 make argocd-password        # Afficher le mot de passe admin initial
 make gitlab-password        # Afficher le mot de passe root initial

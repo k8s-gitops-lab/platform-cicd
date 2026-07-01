@@ -10,7 +10,9 @@ argocd/
 scripts/
   platform_inventory.py      Modèle historique d'inventaire apps
   render-argocd-apps.py      Génère les manifests ArgoCD depuis argocd/apps/<app>/app.yaml
+  run-bootstrap.py           Exécute la séquence bootstrap avec START_AT/STOP_AFTER
   filter-argocd-install.py   Filtre le manifest ArgoCD (retire notifications)
+  gitlab_bootstrap.py        Helpers readiness GitLab ciblée
   gitlab-tf-credentials.py   Crée le PAT/Secret GitLab consommé par Terraform
   gitlab-dex-oauth-app.py    Crée l'app OAuth GitLab pour Dex
   gitlab-runner-token.py     Crée le token runner et le Secret K8s
@@ -40,32 +42,48 @@ Télécharge ou lit le manifest d'installation ArgoCD et filtre les ressources
 `argocd-notifications-*` non utilisées dans ce POC. Accepte une URL ou un
 chemin local.
 
+## `run-bootstrap.py` — séquence relançable
+
+`make bootstrap` délègue à `run-bootstrap.py` avec la liste ordonnée des étapes
+Makefile. Le script exécute chaque étape une par une via `make <étape>` et
+supporte :
+
+- `START_AT=<étape>` pour reprendre après correction à la bonne étape ;
+- `STOP_AFTER=<étape>` pour s'arrêter volontairement après une étape ;
+- `make bootstrap-from-<étape>` comme raccourci de reprise.
+
+Les étapes `*-wait` globales ne font pas partie de la séquence : les prérequis
+sont vérifiés au plus près de l'action qui en dépend.
+
 ## `gitlab-dex-oauth-app.py` — OAuth GitLab → Dex
 
 1. Vérifie l'idempotence : `argocd-secret` contient-il déjà `dex.gitlab.clientID` ?
-2. Récupère le mot de passe root GitLab depuis le Secret K8s.
-3. S'authentifie via l'API GitLab (password grant OAuth2).
-4. Crée l'application OAuth avec `trusted: true` et `confidential: true`.
-5. Patch `argocd-secret` avec `dex.gitlab.clientID` et `dex.gitlab.clientSecret`.
+2. Attend la readiness API GitLab via `/-/readiness`.
+3. Récupère le mot de passe root GitLab depuis le Secret K8s.
+4. S'authentifie via l'API GitLab (password grant OAuth2).
+5. Crée l'application OAuth avec `trusted: true` et `confidential: true`.
+6. Patch `argocd-secret` avec `dex.gitlab.clientID` et `dex.gitlab.clientSecret`.
 
 ## `gitlab-tf-credentials.py` — token Terraform GitLab
 
 1. Vérifie si `flux-system/gitlab-tf-credentials` existe avec un token encore
    valide contre l'API GitLab.
-2. Si absent ou invalide, récupère le mot de passe root GitLab depuis le Secret
+2. Attend la readiness API GitLab via `/-/readiness`.
+3. Si absent ou invalide, récupère le mot de passe root GitLab depuis le Secret
    K8s `gitlab-gitlab-initial-root-password`.
-3. S'authentifie via l'API GitLab (password grant OAuth2).
-4. Crée/rotate un PAT `terraform-controller` avec les scopes `api`,
+4. S'authentifie via l'API GitLab (password grant OAuth2).
+5. Crée/rotate un PAT `terraform-controller` avec les scopes `api`,
    `read_repository`, `write_repository`.
-5. Applique le Secret K8s `gitlab-tf-credentials` dans `flux-system`, consommé
+6. Applique le Secret K8s `gitlab-tf-credentials` dans `flux-system`, consommé
    par `Terraform/gitlab-iac`.
 
 ## `gitlab-runner-token.py` — token runner
 
 1. Vérifie l'idempotence : le Secret `gitlab-gitlab-runner-secret` existe-t-il avec un token ?
-2. S'authentifie via l'API GitLab.
-3. Crée un runner d'instance via `/api/v4/user/runners`.
-4. Applique un Secret K8s via `kubectl apply` (dry-run + pipe).
+2. Attend la readiness API GitLab via `/-/readiness`.
+3. S'authentifie via l'API GitLab.
+4. Crée un runner d'instance via `/api/v4/user/runners`.
+5. Applique un Secret K8s via `kubectl apply` (dry-run + pipe).
 
 ## Dépendances
 

@@ -12,8 +12,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from gitlab_bootstrap import ssl_context, wait_for_gitlab_ready
+
 GITLAB_NAMESPACE = os.environ.get("GITLAB_NAMESPACE", "gitlab")
 GITLAB_URL = os.environ.get("GITLAB_URL", "https://gitlab.192.168.33.100.nip.io")
+GITLAB_INSECURE_TLS = os.environ.get("GITLAB_INSECURE_TLS", "true").lower() not in ("0", "false", "no")
+GITLAB_READY_TIMEOUT = int(os.environ.get("GITLAB_READY_TIMEOUT", "600"))
 SECRET_NAME = os.environ.get("SECRET_NAME", "gitlab-gitlab-runner-secret")
 
 
@@ -35,7 +39,7 @@ def gitlab_post(path, data, token=None):
         headers=headers,
         method="POST",
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, context=ssl_context(GITLAB_INSECURE_TLS)) as resp:
         return json.loads(resp.read())
 
 
@@ -45,6 +49,7 @@ def kube_apply(cmd):
 
 
 def main() -> None:
+    wait_for_gitlab_ready(GITLAB_URL, ssl_context(GITLAB_INSECURE_TLS), GITLAB_READY_TIMEOUT)
     exists = subprocess.run(
         ["kubectl", "-n", GITLAB_NAMESPACE, "get", "secret", SECRET_NAME],
         capture_output=True,

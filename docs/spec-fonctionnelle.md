@@ -2,28 +2,36 @@
 
 ## Bootstrap de la plateforme
 
-Le bootstrap est **idempotent** : chaque étape vérifie si l'état cible est déjà
-atteint avant d'agir. `make bootstrap` exécute dans l'ordre :
+Le bootstrap est **idempotent** et **relançable par étape** : chaque étape
+vérifie si l'état cible est déjà atteint avant d'agir. `make bootstrap` exécute
+dans l'ordre :
 
 1. **`argocd-install`** — Installe ArgoCD dans le namespace `argocd`. Filtre les
    ressources `notifications` non utilisées.
-2. **`argocd-wait`** — Attend que tous les déploiements ArgoCD soient `Available`.
-3. **`argocd-trust-corporate-ca`** — Injecte le certificat CA Zscaler dans
+2. **`argocd-trust-corporate-ca`** — Injecte le certificat CA Zscaler dans
    `argocd-repo-server` pour que les clones HTTPS soient acceptés.
-4. **`argocd-trust-local-gateway-ca`** — Injecte le certificat de la Gateway
+3. **`argocd-trust-local-gateway-ca`** — Injecte le certificat de la Gateway
    locale dans `argocd-dex-server` pour que le callback OAuth GitLab fonctionne.
-5. **`argocd-bootstrap`** — Applique `argocd/root-app.yaml`. ArgoCD se
+4. **`argocd-bootstrap`** — Applique `argocd/root-app.yaml`. ArgoCD se
    synchronise ensuite lui-même depuis `platform-gitops`.
+5. **`flux-sops-age`** — Injecte la clé privée age nécessaire au déchiffrement
+   SOPS par Flux.
 6. **`argocd-ingress`** — Configure ArgoCD en mode HTTP (insecure) pour être
    exposé derrière la Gateway Traefik.
-7. **`gitlab-wait`** — Attend que tous les pods GitLab soient `Ready`.
-8. **`gitlab-tf-credentials`** — Crée/rotate le PAT GitLab
+7. **`gitlab-tf-credentials`** — Attend la readiness API GitLab strictement
+   nécessaire, crée/rotate le PAT GitLab
    `terraform-controller` et le stocke dans le Secret `gitlab-tf-credentials`
    du namespace `flux-system`, consommé par `Terraform/gitlab-iac`.
-9. **`gitlab-dex-oauth-app`** — Crée l'application OAuth GitLab pour Dex et
+8. **`gitlab-dex-oauth-app`** — Crée l'application OAuth GitLab pour Dex et
    renseigne `argocd-secret`. Idempotent : ne refait rien si le secret existe.
-10. **`gitlab-runner-token`** — Crée le token runner d'instance et le stocke
+9. **`gitlab-runner-token`** — Crée le token runner d'instance et le stocke
    dans `gitlab-gitlab-runner-secret`. Idempotent.
+
+En cas d'échec, on ne relance pas forcément tout le bootstrap :
+`make bootstrap START_AT=<étape>` reprend à l'étape indiquée et rejoue la suite.
+`make bootstrap STOP_AFTER=<étape>` permet de s'arrêter volontairement après une
+étape. Le raccourci `make bootstrap-from-<étape>` est équivalent à
+`START_AT=<étape>`.
 
 ## Ressources applicatives
 
