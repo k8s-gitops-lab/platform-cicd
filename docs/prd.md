@@ -43,13 +43,14 @@ application :
 
 ## Objectif de scaling
 
-Ajouter une application se limite à une seule PR : ajouter
-`argocd/apps/<app>.yaml` (name, description, services) dans `platform-gitops`.
-Le workflow `platform-gitops/.github/workflows/onboard-apps.yml` se charge
-ensuite, au merge, de :
+Ajouter une application se limite à une seule MR : ajouter
+`argocd/apps/<app>.yaml` (name, description, services) sur le projet GitLab
+`platform-gitops`. Son pipeline `.gitlab-ci.yml` se charge ensuite, au merge,
+de :
 - générer la configuration GitOps dédiée (`argocd/generated/apps/<app>/`) ;
 - déclarer les projets GitLab correspondants dans `gitlab-projects-iac`
-  (`terraform/apps.auto.tfvars.json`), appliqué par le job Terraform `gitlab-iac` ;
+  (`terraform/apps.auto.tfvars.json`), appliqué par le job Terraform `gitlab-iac`
+  (créés vides, sans import GitHub, sauf apps historiques) ;
 - laisser les jobs CI/CD applicatifs initialiser le contenu et les variables
   nécessaires aux pipelines.
 
