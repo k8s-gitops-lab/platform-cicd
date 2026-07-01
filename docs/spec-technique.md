@@ -10,7 +10,7 @@ argocd/
 scripts/
   platform_inventory.py      Modèle historique d'inventaire apps
   render-argocd-apps.py      Génère les manifests ArgoCD depuis argocd/apps/<app>/app.yaml
-  run-bootstrap.py           Exécute la séquence bootstrap avec START_AT/STOP_AFTER
+  bootstrap-tags.py          Calcule le sous-ensemble d'étapes (--tags) a passer a ansible-playbook selon START_AT/STOP_AFTER
   filter-argocd-install.py   Filtre le manifest ArgoCD (retire notifications)
   gitlab_bootstrap.py        Helpers readiness GitLab ciblée
   gitlab-tf-credentials.py   Crée le PAT/Secret GitLab consommé par Terraform
@@ -45,34 +45,30 @@ Télécharge ou lit le manifest d'installation ArgoCD et filtre les ressources
 `argocd-notifications-*` non utilisées dans ce POC. Accepte une URL ou un
 chemin local.
 
-## `run-bootstrap.py` — séquence relançable
+## `ansible/` — séquence de bootstrap complète
 
-`make bootstrap` délègue à `run-bootstrap.py` avec la liste ordonnée des étapes
-Makefile. Le script exécute chaque étape une par une via `make <étape>` et
-supporte :
+Toute la séquence de bootstrap (ArgoCD, Flux, GitLab) est portée par un seul
+playbook `ansible/playbook.yml`, dans l'ordre déclaré par `BOOTSTRAP_STEPS`
+du Makefile — cf. la règle d'ordre de préférence dans `AGENTS.md` (TF/K8s
+déclaratif, puis Ansible pour l'orchestration multi-étapes, Make en dernier
+recours comme point d'entrée). `make bootstrap` ne fait que calculer le
+sous-ensemble d'étapes à exécuter puis lance **un seul**
+`ansible-playbook playbook.yml --tags <étapes>` :
 
-- `START_AT=<étape>` pour reprendre après correction à la bonne étape ;
-- `STOP_AFTER=<étape>` pour s'arrêter volontairement après une étape ;
-- `make bootstrap-from-<étape>` comme raccourci de reprise.
+- `scripts/bootstrap-tags.py` calcule la liste `--tags` (comma-séparée) selon
+  `START_AT`/`STOP_AFTER`, sans exécuter quoi que ce soit lui-même — c'est
+  `ansible-playbook` qui séquence réellement les tâches, dans l'ordre où
+  elles apparaissent dans `playbook.yml` (indépendant de l'ordre des tags
+  passés en `--tags`).
+- `make bootstrap-from-<étape>` reste le raccourci `START_AT=<étape>`.
 
-Les étapes `*-wait` globales ne font pas partie de la séquence : les prérequis
-sont vérifiés au plus près de l'action qui en dépend.
-
-## `ansible/` — étapes de bootstrap ArgoCD/Flux
-
-Les étapes du bootstrap qui manipulent l'état du cluster (namespace, CA
-bundle, ConfigMap, patch, rollout) sont exprimées en tâches Ansible plutôt
-qu'en shell brut dans le Makefile — cf. la règle d'ordre de préférence dans
-`AGENTS.md` (TF/K8s déclaratif, puis Ansible, Make en dernier recours). Chaque
-cible Makefile devenue concernée n'est plus qu'un appel à `ansible-playbook
-playbook.yml --tags <étape>` :
+Chaque cible Makefile individuelle (`argocd-install`, `argocd-bootstrap`,
+`argocd-trust-corporate-ca`, `argocd-trust-local-gateway-ca`, `flux-sops-age`,
+`argocd-ingress`, `gitlab-tf-credentials`, `gitlab-dex-oauth-app`,
+`gitlab-runner-token`) reste utilisable seule et n'est qu'un appel à
+`ansible-playbook playbook.yml --tags <étape>` :
 
 - `argocd-install` : namespace ArgoCD + manifest filtré (`server-side apply`).
-- `argocd-bootstrap` : attente du CRD `Application` puis application de
-  `argocd/root-app.yaml`.
-- `argocd-ingress` : bascule `server.insecure=true` et redémarrage conditionnel.
-- `flux-sops-age` : vérifie la clé age locale, crée le namespace `flux-system`
-  et le Secret `sops-age`.
 - `argocd-trust-corporate-ca` / `argocd-trust-local-gateway-ca` : instances du
   rôle `argocd_trust_ca`, paramétrées par le déploiement ciblé
   (`argocd-repo-server` / `argocd-dex-server`), le fichier de patch et la
@@ -81,10 +77,16 @@ playbook.yml --tags <étape>` :
   locale). Le rôle attend le rollout, extrait le bundle CA du pod, fusionne
   avec le certificat additionnel, recrée le ConfigMap, patche le déploiement
   puis attend de nouveau le rollout.
-
-Les étapes GitLab (`gitlab-tf-credentials`, `gitlab-dex-oauth-app`,
-`gitlab-runner-token`) restent des scripts Python : elles gèrent déjà leur
-propre polling/idempotence contre l'API GitLab et n'ont pas été migrées.
+- `argocd-bootstrap` : attente du CRD `Application` puis application de
+  `argocd/root-app.yaml`.
+- `flux-sops-age` : vérifie la clé age locale, crée le namespace `flux-system`
+  et le Secret `sops-age`.
+- `argocd-ingress` : bascule `server.insecure=true` et redémarrage conditionnel.
+- `gitlab-tf-credentials` / `gitlab-dex-oauth-app` / `gitlab-runner-token` :
+  tâches qui invoquent les scripts Python correspondants (variables d'env via
+  `environment:` sur la tâche) — ces scripts gèrent déjà leur propre
+  polling/idempotence contre l'API GitLab, seule leur invocation a été
+  déplacée dans le playbook.
 
 ## `gitlab-dex-oauth-app.py` — OAuth GitLab → Dex
 
