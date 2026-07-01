@@ -36,7 +36,7 @@ make status                 # État des Applications ArgoCD
 | `argocd/repo-server-ca-patch.yaml` | Patch CA corporate pour argocd-repo-server |
 | `argocd/dex-ca-patch.yaml` | Patch CA pour argocd-dex-server |
 | `scripts/platform_inventory.py` | Modèle de données historique partagé avec `toolbox` |
-| `scripts/render-argocd-apps.py` | Génère `platform-gitops/argocd/generated/apps/*` depuis `argocd/apps/<app>/app.yaml` |
+| `scripts/render-argocd-apps.py` | Génère `platform-gitops/argocd/generated/apps/*` depuis `argocd/apps/<app>.yaml` (propage aussi `description` dans `AppProject.spec.description`). Rejoué automatiquement par `platform-gitops/.github/workflows/onboard-apps.yml` — `make argocd-apps-render` reste utile en local |
 | `scripts/filter-argocd-install.py` | Filtre le manifest ArgoCD (retire les notifications) |
 | `scripts/gitlab-tf-credentials.py` | Crée le PAT GitLab et le Secret K8s consommés par Terraform |
 | `scripts/gitlab-dex-oauth-app.py` | Configure SSO GitLab → Dex → ArgoCD |

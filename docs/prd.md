@@ -43,15 +43,18 @@ application :
 
 ## Objectif de scaling
 
-Ajouter une application doit se limiter à :
-- créer un dossier `argocd/apps/<app>/` dans `platform-gitops` avec la
-  configuration GitOps dédiée ;
-- déclarer les projets GitLab correspondants dans `gitlab-projects-iac`, appliqué
-  par le job Terraform `gitlab-iac` ;
+Ajouter une application se limite à une seule PR : ajouter
+`argocd/apps/<app>.yaml` (name, description, services) dans `platform-gitops`.
+Le workflow `platform-gitops/.github/workflows/onboard-apps.yml` se charge
+ensuite, au merge, de :
+- générer la configuration GitOps dédiée (`argocd/generated/apps/<app>/`) ;
+- déclarer les projets GitLab correspondants dans `gitlab-projects-iac`
+  (`terraform/apps.auto.tfvars.json`), appliqué par le job Terraform `gitlab-iac` ;
 - laisser les jobs CI/CD applicatifs initialiser le contenu et les variables
   nécessaires aux pipelines.
 
-Aucune duplication de logique CI, aucune configuration ArgoCD manuelle.
+Aucune duplication de logique CI, aucune configuration ArgoCD manuelle, aucune
+étape Terraform manuelle.
 
 ## Critères d'acceptation du POC
 

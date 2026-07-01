@@ -19,6 +19,7 @@ def app_project(app: dict) -> dict:
         "kind": "AppProject",
         "metadata": {"name": app["argocd"]["project"], "namespace": "argocd"},
         "spec": {
+            "description": app.get("description", ""),
             "sourceRepos": app["argocd"]["sourceRepos"],
             "destinations": app["argocd"]["destinations"],
             "clusterResourceWhitelist": [{"group": "", "kind": "Namespace"}],
