@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate ArgoCD app resources from argocd/apps/<app>/app.yaml."""
+"""Generate ArgoCD app resources from argocd/apps/<app>.yaml."""
 from __future__ import annotations
 
 import argparse

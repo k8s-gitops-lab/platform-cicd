@@ -9,7 +9,7 @@ argocd/
   dex-ca-patch.yaml          Patch strategic merge pour le CA Gateway
 scripts/
   platform_inventory.py      Modèle historique d'inventaire apps
-  render-argocd-apps.py      Génère les manifests ArgoCD depuis argocd/apps/<app>/app.yaml
+  render-argocd-apps.py      Génère les manifests ArgoCD depuis argocd/apps/<app>.yaml
   bootstrap-tags.py          Calcule le sous-ensemble d'étapes (--tags) a passer a ansible-playbook selon START_AT/STOP_AFTER
   filter-argocd-install.py   Filtre le manifest ArgoCD (retire notifications)
   gitlab_bootstrap.py        Helpers readiness GitLab ciblée
@@ -26,7 +26,7 @@ requirements.txt             pyyaml
 ## Ressources applicatives
 
 Les ressources propres aux applications sont décrites sous
-`platform-gitops/argocd/apps/<app>/app.yaml`. `render-argocd-apps.py` lit ces
+`platform-gitops/argocd/apps/<app>.yaml`. `render-argocd-apps.py` lit ces
 descriptions, normalise les conventions via `platform_inventory.py`, puis écrit :
 
 - `platform-gitops/argocd/generated/apps/<app>/app-project.yaml` ;

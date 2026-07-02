@@ -75,7 +75,7 @@ dépôt voisin.
 
 - **`argocd/root-app.yaml` est appliqué une seule fois** via `make argocd-bootstrap`.
   ArgoCD se synchronise ensuite en continu depuis `platform-gitops/argocd/managed/`.
-- **Les applications sont décrites par `argocd/apps/<app>/app.yaml`**. Les
+- **Les applications sont décrites par `argocd/apps/<app>.yaml`**. Les
   manifests ArgoCD dédiés sont générés dans `argocd/generated/apps/<app>/`.
 - **`argocd/managed/` dans `platform-gitops` est réservé aux points d'entrée
   ArgoCD génériques**.
