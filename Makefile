@@ -14,12 +14,12 @@ FLUX_NAMESPACE    ?= flux-system
 SOPS_AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
 START_AT ?=
 STOP_AFTER ?=
-BOOTSTRAP_STEPS = argocd-install argocd-trust-corporate-ca argocd-trust-local-gateway-ca argocd-bootstrap flux-sops-age argocd-ingress gitlab-tf-credentials gitlab-dex-oauth-app gitlab-runner-token
 
-# Le rôle Ansible platform_bootstrap vit dans cluster/ansible (dépôt voisin,
+# Le rôle Ansible platform_bootstrap vit dans infrastructure/ansible (dépôt voisin,
 # checkout sibling requis) ; platform-cicd ne porte plus que ses scripts et
 # manifests (scripts/, argocd/), consommés via platform_cicd_root.
-ANSIBLE_DIR = ../cluster/ansible
+ANSIBLE_DIR = ../infrastructure/ansible
+BOOTSTRAP_TASKS_FILE = $(ANSIBLE_DIR)/roles/platform_bootstrap/tasks/main.yml
 
 # Variables transmises telles quelles au rôle platform_bootstrap (mêmes
 # defaults des deux côtés). Chaque cible ci-dessous ne fait que sélectionner
@@ -42,7 +42,7 @@ help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
 bootstrap: ## Deploie la plateforme sur le contexte Kubernetes courant (un seul ansible-playbook), relancable avec START_AT=<etape>
-	@tags=$$(python3 ./scripts/bootstrap-tags.py --start-at "$(START_AT)" --stop-after "$(STOP_AFTER)" $(BOOTSTRAP_STEPS)); \
+	@tags=$$(python3 ./scripts/bootstrap-tags.py --start-at "$(START_AT)" --stop-after "$(STOP_AFTER)" --tasks-file "$(BOOTSTRAP_TASKS_FILE)"); \
 	echo "==> platform-cicd: bootstrap (ansible) --tags $$tags"; \
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags "$$tags" $(ANSIBLE_VARS)
 	@echo ""
@@ -108,8 +108,8 @@ argocd-apps-render: ## Genere les manifests ArgoCD depuis argocd/apps/<app>/app.
 check-generated: ## Verifie que les manifests apps generes sont a jour
 	APPS_FILE="$(GITOPS_APPS_FILE)" python3 ./scripts/render-argocd-apps.py --check
 
-init-project: ## Deprecated: creer argocd/apps/<app>/ directement
-	@echo "Creer argocd/apps/<app>/app.yaml puis lancer make argocd-apps-render." >&2
+init-project: ## Deprecated: creer argocd/apps/<app>.yaml directement
+	@echo "Creer argocd/apps/<app>.yaml puis lancer make argocd-apps-render." >&2
 	@exit 1
 
 flux-sops-age: ## Injecte la cle age privee dans flux-system pour le dechiffrement SOPS (bootstrap uniquement)

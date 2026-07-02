@@ -38,7 +38,7 @@ En cas d'échec, on ne relance pas forcément tout le bootstrap :
 Les Applications, ApplicationSets, AppProjects, namespaces et credentials propres
 aux applications ne sont plus écrits à la main. Ils sont générés par application
 sous `platform-gitops/argocd/generated/apps/<app>/` à partir de
-`platform-gitops/argocd/apps/<app>/app.yaml`.
+`platform-gitops/argocd/apps/<app>.yaml`.
 
 `make argocd-apps-render` régénère ces manifests et l'ApplicationSet générique
 `platform-gitops/argocd/managed/apps-appset.yaml`, qui pointe vers
@@ -60,7 +60,7 @@ et renseignés par `gitlab-dex-oauth-app.py`.
 ## Registre d'images (GHCR)
 
 Il n'y a pas de registry Docker interne au cluster. Les images buildées par
-Kaniko sont poussées vers GHCR (`ghcr.io/poc-devops-elkouhen/<app>`, voir
+Kaniko sont poussées vers GHCR (`ghcr.io/k8s-gitops-lab/<app>`, voir
 `control-plane/platform.yml`). Les Deployments applicatifs tirent l'image
 directement depuis GHCR ; le secret de pull (`ghcr-pull-secret`, déployé par
 `control-plane` puis recopié par app via `render-argocd-apps.py`) est

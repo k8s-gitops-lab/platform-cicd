@@ -8,9 +8,9 @@ import yaml
 
 _PLATFORM_DEFAULTS = {
     "domain": "192.168.33.100.nip.io",
-    "repoURL": "https://github.com/poc-devops-elkouhen/platform-gitops.git",
+    "repoURL": "https://github.com/k8s-gitops-lab/platform-gitops.git",
     "targetRevision": "main",
-    "registry": {"host": "ghcr.io/poc-devops-elkouhen"},
+    "registry": {"host": "ghcr.io/k8s-gitops-lab"},
 }
 
 _GITLAB_APPS_NAMESPACE = "infra"
