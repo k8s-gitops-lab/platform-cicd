@@ -15,10 +15,11 @@ Une fois le bootstrap effectué, ArgoCD gère la plateforme en continu depuis
 - `kubectl` dans le PATH avec un kubeconfig valide pointant sur le cluster cible.
 - `ansible-playbook` dans le PATH. Les étapes ArgoCD/Flux/GitLab du bootstrap
   vivent désormais dans le rôle `platform_bootstrap` du dépôt voisin
-  `cluster/ansible/` (cf. `cluster/AGENTS.md`) — suppose un checkout sibling
-  standard du POC (`cluster` cloné à côté de `platform-cicd`).
-- Le cluster doit avoir été provisionné par `cluster` (Traefik, Gateway API,
-  MetalLB actifs).
+  `infrastructure/ansible/` (cf. `infrastructure/AGENTS.md`) — suppose un
+  checkout sibling standard du POC (`infrastructure` cloné à côté de
+  `platform-cicd`).
+- Le cluster doit avoir été provisionné par `infrastructure` (Traefik,
+  Gateway API, MetalLB actifs).
 
 ## Commandes principales
 
@@ -52,9 +53,9 @@ make status                 # État des Applications ArgoCD
 | `scripts/bootstrap-tags.py` | Calcule le sous-ensemble d'étapes (`--tags`) à passer à `ansible-playbook` selon `START_AT`/`STOP_AFTER` — ne séquence rien lui-même |
 
 Le code Ansible (playbook, rôles `platform_bootstrap` et `argocd_trust_ca`)
-a été fusionné dans `cluster/ansible/` (cf. `cluster/AGENTS.md`). Ce dépôt ne
-garde que les scripts et manifests qu'il invoque (`scripts/*.py`,
-`argocd/*.yaml`), référencés depuis `cluster/ansible` via la variable
+a été fusionné dans `infrastructure/ansible/` (cf. `infrastructure/AGENTS.md`).
+Ce dépôt ne garde que les scripts et manifests qu'il invoque (`scripts/*.py`,
+`argocd/*.yaml`), référencés depuis `infrastructure/ansible` via la variable
 `platform_cicd_root` (le `Makefile` la fixe à `$(CURDIR)`).
 
 ## Ordre de préférence pour le déploiement
@@ -67,7 +68,7 @@ que dans un enchaînement de cibles Make. C'est pourquoi les étapes de
 bootstrap ArgoCD/Flux/GitLab (autrefois du shell brut dans le Makefile, puis
 séquencées par `scripts/run-bootstrap.py` en appelant `make <étape>` en
 boucle) vivent maintenant dans le rôle `platform_bootstrap` de
-`cluster/ansible/` : `make bootstrap` ne calcule plus qu'un `--tags` et
+`infrastructure/ansible/` : `make bootstrap` ne calcule plus qu'un `--tags` et
 délègue tout le séquencement à un seul `ansible-playbook`, exécuté dans le
 dépôt voisin.
 

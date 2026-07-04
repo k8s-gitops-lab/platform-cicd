@@ -12,13 +12,13 @@ cluster. La configuration suivie en continu par ArgoCD vit dans le repo frere
 
 ## Prerequis
 
-- Un cluster Kubernetes deja provisionne par `cluster`.
+- Un cluster Kubernetes deja provisionne par `infrastructure`.
 - Gateway API, Traefik et MetalLB disponibles.
-- Les repos freres clones a cote de celui-ci :
-  - `../ci-templates`
-  - `../helloworld`
-  - `../helloworld-iac`
-  - `../platform-gitops`
+- Le repo frere `../infrastructure` clone a cote de celui-ci (le bootstrap
+  execute le role Ansible `platform_bootstrap` qui y vit).
+- `../platform-gitops` clone a cote, uniquement pour les cibles locales
+  `argocd-apps-render` / `check-generated` (ArgoCD lit ce depot depuis GitHub,
+  pas depuis le disque).
 
 ## Usage
 
@@ -26,7 +26,8 @@ cluster. La configuration suivie en continu par ArgoCD vit dans le repo frere
 make bootstrap
 ```
 
-URLs par defaut :
+URLs par defaut (TLS termine par la Gateway avec un certificat auto-signe, a
+accepter au premier acces) :
 
-- GitLab : `http://gitlab.192.168.33.100.nip.io`
-- ArgoCD : `http://argocd.192.168.33.100.nip.io`
+- GitLab : `https://gitlab.192.168.33.100.nip.io`
+- ArgoCD : `https://argocd.192.168.33.100.nip.io`

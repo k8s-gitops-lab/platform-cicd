@@ -16,12 +16,14 @@ scripts/
   gitlab-tf-credentials.py   Crée le PAT/Secret GitLab consommé par Terraform
   gitlab-dex-oauth-app.py    Crée l'app OAuth GitLab pour Dex
   gitlab-runner-token.py     Crée le token runner et le Secret K8s
-ansible/
-  playbook.yml                Étapes ArgoCD/Flux du bootstrap, sélectionnées via --tags
-  roles/argocd_trust_ca/      Rôle paramétré, réutilisé par argocd-trust-corporate-ca et argocd-trust-local-gateway-ca
 Makefile
 requirements.txt             pyyaml
 ```
+
+Le code Ansible du bootstrap (playbook `playbook-platform.yml`, rôles
+`platform_bootstrap` et `argocd_trust_ca`) vit dans le dépôt voisin
+`infrastructure/ansible/` ; le `Makefile` de ce dépôt l'invoque en relatif
+(cf. `AGENTS.md`).
 
 ## Ressources applicatives
 
@@ -44,28 +46,28 @@ Télécharge ou lit le manifest d'installation ArgoCD et filtre les ressources
 `argocd-notifications-*` non utilisées dans ce POC. Accepte une URL ou un
 chemin local.
 
-## `ansible/` — séquence de bootstrap complète
+## Séquence de bootstrap (Ansible, dans `infrastructure/ansible/`)
 
 Toute la séquence de bootstrap (ArgoCD, Flux, GitLab) est portée par un seul
-playbook `ansible/playbook.yml`, dans l'ordre déclaré par `BOOTSTRAP_STEPS`
-du Makefile — cf. la règle d'ordre de préférence dans `AGENTS.md` (TF/K8s
-déclaratif, puis Ansible pour l'orchestration multi-étapes, Make en dernier
-recours comme point d'entrée). `make bootstrap` ne fait que calculer le
-sous-ensemble d'étapes à exécuter puis lance **un seul**
-`ansible-playbook playbook.yml --tags <étapes>` :
+playbook `playbook-platform.yml` du dépôt voisin `infrastructure/ansible/`,
+dans l'ordre déclaré par `BOOTSTRAP_STEPS` du Makefile — cf. la règle d'ordre
+de préférence dans `AGENTS.md` (TF/K8s déclaratif, puis Ansible pour
+l'orchestration multi-étapes, Make en dernier recours comme point d'entrée).
+`make bootstrap` ne fait que calculer le sous-ensemble d'étapes à exécuter
+puis lance **un seul** `ansible-playbook playbook-platform.yml --tags <étapes>` :
 
 - `scripts/bootstrap-tags.py` calcule la liste `--tags` (comma-séparée) selon
   `START_AT`/`STOP_AFTER`, sans exécuter quoi que ce soit lui-même — c'est
   `ansible-playbook` qui séquence réellement les tâches, dans l'ordre où
-  elles apparaissent dans `playbook.yml` (indépendant de l'ordre des tags
-  passés en `--tags`).
+  elles apparaissent dans `playbook-platform.yml` (indépendant de l'ordre des
+  tags passés en `--tags`).
 - `make bootstrap-from-<étape>` reste le raccourci `START_AT=<étape>`.
 
 Chaque cible Makefile individuelle (`argocd-install`, `argocd-bootstrap`,
 `argocd-trust-corporate-ca`, `argocd-trust-local-gateway-ca`, `flux-sops-age`,
 `argocd-ingress`, `gitlab-tf-credentials`, `gitlab-dex-oauth-app`,
 `gitlab-runner-token`) reste utilisable seule et n'est qu'un appel à
-`ansible-playbook playbook.yml --tags <étape>` :
+`ansible-playbook playbook-platform.yml --tags <étape>` :
 
 - `argocd-install` : namespace ArgoCD + manifest filtré (`server-side apply`).
 - `argocd-trust-corporate-ca` / `argocd-trust-local-gateway-ca` : instances du

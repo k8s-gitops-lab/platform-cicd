@@ -1,8 +1,8 @@
 # PRD — platform-cicd
 
-> Document de référence pour la vision et le périmètre du POC. Tous les autres
-> dépôts (`cluster`, `helloworld`, `ci-templates`, `toolbox`, `helloworld-iac`,
-> `platform-gitops`) pointent vers ce fichier pour la vision globale.
+> Vision et périmètre de ce dépôt : le bootstrap de la plateforme. La vision
+> globale du POC (intention, scaling, limites acceptées) vit dans
+> [`control-plane/docs/prd.md`](../../control-plane/docs/prd.md).
 
 ## Intention du projet
 
@@ -10,7 +10,7 @@ Ce dépôt porte le bootstrap et la maintenance d'une chaîne CI/CD complète,
 autohébergée sur un cluster Kubernetes local. L'objectif est de démontrer un
 pattern reproductible couvrant :
 
-- un cluster Kubernetes local reproductible (`cluster`) ;
+- un cluster Kubernetes local reproductible (`infrastructure`) ;
 - une plateforme GitOps pilotée par ArgoCD, avec GitLab et un runner CI
   déployés déclarativement depuis `platform-gitops` ;
 - un template CI partagé et versionné (`ci-templates`) utilisable sans
@@ -61,19 +61,19 @@ Aucune duplication de logique CI, aucune configuration ArgoCD manuelle, aucune
 
 - `make bootstrap` depuis ce dépôt déploie la plateforme complète sur un
   cluster vierge, sans configuration applicative préchargée.
-- GitLab est accessible sur `https://gitlab.<domaine>`.
+- GitLab est accessible sur `https://gitlab.<domaine>` (certificat auto-signé
+  terminé par la Gateway, à accepter au premier accès).
 - ArgoCD est accessible sur `https://argocd.<domaine>` avec SSO GitLab.
 - Après onboarding applicatif, un pipeline complet (build → dev → rec → prod)
   s'exécute sans intervention manuelle hormis les gates de promotion.
 
 ## Limites acceptées (non-objectifs du POC)
 
-- **Branches manifests non protégées contre un push humain direct** (`dev`,
-  `rec`, `preprod`) : seule `main` est protégée. Acceptable en contexte
-  mono-opérateur ; à traiter avec une vraie équipe via comptes de service.
-- **`GITLAB_PUSH_TOKEN` est un token personnel `root` à scope complet** : rayon
-  d'explosion maximal en cas de fuite. Cible long terme : token de projet par
-  app, scopé au strict nécessaire.
+Les limites globales du POC (protection des branches manifests, portée du
+token `GITLAB_PUSH_TOKEN`) sont détaillées dans
+[`control-plane/docs/prd.md`](../../control-plane/docs/prd.md#limites-acceptées-non-objectifs-explicites-du-poc).
+S'y ajoutent, propres à ce dépôt :
+
 - **TLS auto-signé** : les scripts désactivent la vérification TLS par défaut
   (`GITLAB_INSECURE_TLS=true`). Non adapté à un environnement ouvert.
 - **Cluster non hautement disponible** : 1 master + 1 worker, sans redondance.
