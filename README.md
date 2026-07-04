@@ -12,10 +12,10 @@ cluster. La configuration suivie en continu par ArgoCD vit dans le repo frere
 
 ## Prerequis
 
-- Un cluster Kubernetes deja provisionne par `infrastructure`.
-- Gateway API, Traefik et MetalLB disponibles.
-- Le repo frere `../infrastructure` clone a cote de celui-ci (le bootstrap
-  execute le role Ansible `platform_bootstrap` qui y vit).
+- Un cluster Kubernetes deja provisionne par `infrastructure` (Traefik,
+  Gateway API, MetalLB actifs).
+- `ansible-playbook` dans le PATH (le role de bootstrap `platform_bootstrap`
+  vit dans `ansible/` de ce depot).
 - `../platform-gitops` clone a cote, uniquement pour les cibles locales
   `argocd-apps-render` / `check-generated` (ArgoCD lit ce depot depuis GitHub,
   pas depuis le disque).

@@ -1,0 +1,59 @@
+---
+- name: Installer ArgoCD
+  tags: [argocd-install]
+  ansible.builtin.import_tasks: argocd-install.yml
+
+- name: Faire confiance au CA corporate pour argocd-repo-server
+  tags: [argocd-trust-corporate-ca]
+  ansible.builtin.include_role:
+    name: argocd_trust_ca
+    apply:
+      tags: [argocd-trust-corporate-ca]
+  vars:
+    trust_ca_namespace: "{{ argocd_namespace }}"
+    trust_ca_wait_timeout: "{{ argocd_wait_timeout }}"
+    trust_ca_deployment: argocd-repo-server
+    trust_ca_configmap: argocd-repo-server-ca-bundle
+    trust_ca_patch_file: "{{ platform_cicd_root }}/argocd/repo-server-ca-patch.yaml"
+    trust_ca_extra_cert_command: >-
+      security find-certificate -a -c "{{ corporate_ca_label }}" -p /Library/Keychains/System.keychain
+
+- name: Faire confiance au CA de la Gateway locale pour argocd-dex-server
+  tags: [argocd-trust-local-gateway-ca]
+  ansible.builtin.include_role:
+    name: argocd_trust_ca
+    apply:
+      tags: [argocd-trust-local-gateway-ca]
+  vars:
+    trust_ca_namespace: "{{ argocd_namespace }}"
+    trust_ca_wait_timeout: "{{ argocd_wait_timeout }}"
+    trust_ca_deployment: argocd-dex-server
+    trust_ca_container: dex
+    trust_ca_configmap: argocd-dex-ca-bundle
+    trust_ca_patch_file: "{{ platform_cicd_root }}/argocd/dex-ca-patch.yaml"
+    trust_ca_extra_cert_command: >-
+      kubectl -n default get secret nip-io-wildcard-tls -o jsonpath='{.data.tls\.crt}' | base64 -d
+
+- name: Appliquer le root Application ArgoCD
+  tags: [argocd-bootstrap]
+  ansible.builtin.import_tasks: argocd-bootstrap.yml
+
+- name: Injecter la clé age SOPS pour Flux
+  tags: [flux-sops-age]
+  ansible.builtin.import_tasks: flux-sops-age.yml
+
+- name: Configurer ArgoCD en HTTP (bootstrap uniquement)
+  tags: [argocd-ingress]
+  ansible.builtin.import_tasks: argocd-ingress.yml
+
+- name: Créer le PAT GitLab et le Secret K8s pour Terraform
+  tags: [gitlab-tf-credentials]
+  ansible.builtin.import_tasks: gitlab-tf-credentials.yml
+
+- name: Créer l'application OAuth GitLab pour Dex
+  tags: [gitlab-dex-oauth-app]
+  ansible.builtin.import_tasks: gitlab-dex-oauth-app.yml
+
+- name: Créer le Secret K8s du token runner GitLab
+  tags: [gitlab-runner-token]
+  ansible.builtin.import_tasks: gitlab-runner-token.yml

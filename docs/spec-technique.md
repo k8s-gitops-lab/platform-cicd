@@ -16,14 +16,15 @@ scripts/
   gitlab-tf-credentials.py   Crée le PAT/Secret GitLab consommé par Terraform
   gitlab-dex-oauth-app.py    Crée l'app OAuth GitLab pour Dex
   gitlab-runner-token.py     Crée le token runner et le Secret K8s
+ansible/
+  playbook-platform.yml      Étapes ArgoCD/Flux/GitLab du bootstrap, sélectionnées via --tags
+  ansible.cfg, inventory.ini Config minimale (hosts: local)
+  roles/
+    platform_bootstrap/      Séquence de bootstrap (une tâche/tag par étape)
+    argocd_trust_ca/         Rôle paramétré, réutilisé par argocd-trust-corporate-ca et argocd-trust-local-gateway-ca
 Makefile
 requirements.txt             pyyaml
 ```
-
-Le code Ansible du bootstrap (playbook `playbook-platform.yml`, rôles
-`platform_bootstrap` et `argocd_trust_ca`) vit dans le dépôt voisin
-`infrastructure/ansible/` ; le `Makefile` de ce dépôt l'invoque en relatif
-(cf. `AGENTS.md`).
 
 ## Ressources applicatives
 
@@ -46,13 +47,13 @@ Télécharge ou lit le manifest d'installation ArgoCD et filtre les ressources
 `argocd-notifications-*` non utilisées dans ce POC. Accepte une URL ou un
 chemin local.
 
-## Séquence de bootstrap (Ansible, dans `infrastructure/ansible/`)
+## Séquence de bootstrap (Ansible, dans `ansible/`)
 
 Toute la séquence de bootstrap (ArgoCD, Flux, GitLab) est portée par un seul
-playbook `playbook-platform.yml` du dépôt voisin `infrastructure/ansible/`,
-dans l'ordre déclaré par `BOOTSTRAP_STEPS` du Makefile — cf. la règle d'ordre
-de préférence dans `AGENTS.md` (TF/K8s déclaratif, puis Ansible pour
-l'orchestration multi-étapes, Make en dernier recours comme point d'entrée).
+playbook `ansible/playbook-platform.yml` de ce dépôt, dans l'ordre déclaré
+par `BOOTSTRAP_STEPS` du Makefile — cf. la règle d'ordre de préférence dans
+`AGENTS.md` (TF/K8s déclaratif, puis Ansible pour l'orchestration
+multi-étapes, Make en dernier recours comme point d'entrée).
 `make bootstrap` ne fait que calculer le sous-ensemble d'étapes à exécuter
 puis lance **un seul** `ansible-playbook playbook-platform.yml --tags <étapes>` :
 

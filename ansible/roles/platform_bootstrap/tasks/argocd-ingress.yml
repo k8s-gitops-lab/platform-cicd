@@ -1,0 +1,23 @@
+---
+- name: Attendre argocd-server
+  ansible.builtin.command: >-
+    kubectl -n {{ argocd_namespace }} rollout status deployment argocd-server
+    --timeout={{ argocd_wait_timeout }}
+  changed_when: false
+
+- name: Patcher server.insecure=true
+  ansible.builtin.command: >-
+    kubectl -n {{ argocd_namespace }} patch configmap argocd-cmd-params-cm
+    --type merge -p '{"data":{"server.insecure":"true"}}'
+  register: argocd_ingress_patch
+  changed_when: "'no change' not in argocd_ingress_patch.stdout"
+
+- name: Redémarrer argocd-server
+  ansible.builtin.command: kubectl -n {{ argocd_namespace }} rollout restart deployment argocd-server
+  when: argocd_ingress_patch.changed
+
+- name: Attendre argocd-server après redémarrage
+  ansible.builtin.command: >-
+    kubectl -n {{ argocd_namespace }} rollout status deployment argocd-server
+    --timeout={{ argocd_wait_timeout }}
+  when: argocd_ingress_patch.changed

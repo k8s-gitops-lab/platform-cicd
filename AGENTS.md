@@ -13,11 +13,10 @@ Une fois le bootstrap effectué, ArgoCD gère la plateforme en continu depuis
 ## Prérequis
 
 - `kubectl` dans le PATH avec un kubeconfig valide pointant sur le cluster cible.
-- `ansible-playbook` dans le PATH. Les étapes ArgoCD/Flux/GitLab du bootstrap
-  vivent désormais dans le rôle `platform_bootstrap` du dépôt voisin
-  `infrastructure/ansible/` (cf. `infrastructure/AGENTS.md`) — suppose un
-  checkout sibling standard du POC (`infrastructure` cloné à côté de
-  `platform-cicd`).
+- `ansible-playbook` dans le PATH (collection `ansible.builtin` uniquement,
+  aucune collection externe requise). Les étapes ArgoCD/Flux/GitLab du
+  bootstrap vivent dans le rôle `platform_bootstrap` de `ansible/roles/` de
+  ce dépôt.
 - Le cluster doit avoir été provisionné par `infrastructure` (Traefik,
   Gateway API, MetalLB actifs).
 
@@ -52,11 +51,12 @@ make status                 # État des Applications ArgoCD
 | `scripts/gitlab-runner-token.py` | Crée le Secret K8s du token runner |
 | `scripts/bootstrap-tags.py` | Calcule le sous-ensemble d'étapes (`--tags`) à passer à `ansible-playbook` selon `START_AT`/`STOP_AFTER` — ne séquence rien lui-même |
 
-Le code Ansible (playbook, rôles `platform_bootstrap` et `argocd_trust_ca`)
-a été fusionné dans `infrastructure/ansible/` (cf. `infrastructure/AGENTS.md`).
-Ce dépôt ne garde que les scripts et manifests qu'il invoque (`scripts/*.py`,
-`argocd/*.yaml`), référencés depuis `infrastructure/ansible` via la variable
-`platform_cicd_root` (le `Makefile` la fixe à `$(CURDIR)`).
+Le code Ansible (playbook `ansible/playbook-platform.yml`, rôles
+`platform_bootstrap` et `argocd_trust_ca` sous `ansible/roles/`) vit dans ce
+dépôt, au même titre que les scripts et manifests qu'il invoque
+(`scripts/*.py`, `argocd/*.yaml`), référencés via la variable
+`platform_cicd_root` (par défaut la racine de ce dépôt ; le `Makefile` la
+fixe explicitement à `$(CURDIR)`).
 
 ## Ordre de préférence pour le déploiement
 
@@ -67,10 +67,9 @@ point d'entrée/enchaînement — y compris pour l'orchestration de plusieurs
 que dans un enchaînement de cibles Make. C'est pourquoi les étapes de
 bootstrap ArgoCD/Flux/GitLab (autrefois du shell brut dans le Makefile, puis
 séquencées par `scripts/run-bootstrap.py` en appelant `make <étape>` en
-boucle) vivent maintenant dans le rôle `platform_bootstrap` de
-`infrastructure/ansible/` : `make bootstrap` ne calcule plus qu'un `--tags` et
-délègue tout le séquencement à un seul `ansible-playbook`, exécuté dans le
-dépôt voisin.
+boucle) vivent dans le rôle `platform_bootstrap` de `ansible/roles/` : `make
+bootstrap` ne calcule plus qu'un `--tags` et délègue tout le séquencement à
+un seul `ansible-playbook`.
 
 ## Règles critiques
 

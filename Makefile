@@ -15,10 +15,9 @@ SOPS_AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
 START_AT ?=
 STOP_AFTER ?=
 
-# Le rôle Ansible platform_bootstrap vit dans infrastructure/ansible (dépôt voisin,
-# checkout sibling requis) ; platform-cicd ne porte plus que ses scripts et
-# manifests (scripts/, argocd/), consommés via platform_cicd_root.
-ANSIBLE_DIR = ../infrastructure/ansible
+# Le rôle Ansible platform_bootstrap vit dans ce dépôt (ansible/), au même
+# titre que les scripts et manifests qu'il invoque (scripts/, argocd/).
+ANSIBLE_DIR = ansible
 BOOTSTRAP_TASKS_FILE = $(ANSIBLE_DIR)/roles/platform_bootstrap/tasks/main.yml
 
 # Variables transmises telles quelles au rôle platform_bootstrap (mêmes

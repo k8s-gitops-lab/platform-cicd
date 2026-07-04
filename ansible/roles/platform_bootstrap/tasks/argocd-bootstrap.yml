@@ -1,0 +1,13 @@
+---
+- name: Attendre le CRD Application
+  ansible.builtin.command: >-
+    kubectl wait --for=condition=Established crd/applications.argoproj.io
+    --timeout={{ argocd_wait_timeout }}
+  changed_when: false
+
+- name: Appliquer argocd/root-app.yaml
+  ansible.builtin.command: >-
+    kubectl apply -n {{ argocd_namespace }}
+    -f {{ platform_cicd_root }}/argocd/root-app.yaml
+  register: root_app_apply
+  changed_when: "'unchanged' not in root_app_apply.stdout"

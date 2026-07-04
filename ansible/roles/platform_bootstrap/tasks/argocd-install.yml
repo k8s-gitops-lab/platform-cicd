@@ -1,0 +1,19 @@
+---
+- name: Créer le namespace ArgoCD
+  ansible.builtin.shell: |
+    set -o pipefail
+    kubectl create namespace {{ argocd_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  register: argocd_ns_apply
+  changed_when: "'unchanged' not in argocd_ns_apply.stdout"
+
+# Manifest multi-ressources (CRDs, Deployments, RBAC...) : la sortie
+# mélange created/configured/unchanged par ressource, donc un simple
+# test de sous-chaîne ne peut pas déterminer un changed/pas-changed
+# fiable pour l'ensemble. On assume "changed" à chaque exécution
+# plutôt que de rapporter un faux "pas de changement".
+- name: Appliquer le manifest ArgoCD filtré
+  ansible.builtin.shell: |
+    set -o pipefail
+    python3 {{ argocd_install_filter }} "{{ argocd_install_url }}" \
+      | kubectl apply --server-side --force-conflicts -n {{ argocd_namespace }} -f -
+  register: argocd_install_apply

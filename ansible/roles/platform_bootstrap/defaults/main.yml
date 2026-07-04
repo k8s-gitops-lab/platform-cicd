@@ -1,0 +1,27 @@
+---
+argocd_namespace: argocd
+argocd_version: v3.4.4
+argocd_wait_timeout: 600s
+corporate_ca_label: Zscaler
+flux_namespace: flux-system
+sops_age_key_file: "{{ lookup('env', 'HOME') }}/.config/sops/age/keys.txt"
+gitlab_domain: 192.168.33.100.nip.io
+gitlab_namespace: gitlab
+gitlab_ready_timeout: 600
+gitlab_url: "https://gitlab.{{ gitlab_domain }}"
+argocd_url: "https://argocd.{{ gitlab_domain }}"
+
+# Ce rôle vit dans platform-cicd/ansible/ : platform_cicd_root pointe donc
+# simplement sur la racine du dépôt courant (un niveau au-dessus de ansible/),
+# où vivent les scripts Python et manifests ArgoCD (argocd/, scripts/)
+# consommés par ce rôle. Surchargeable (-e platform_cicd_root=...) si
+# l'appelant est ailleurs.
+platform_cicd_root: "{{ playbook_dir }}/.."
+argocd_install_filter: "{{ platform_cicd_root }}/scripts/filter-argocd-install.py"
+argocd_install_url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
+
+# control-plane porte le secret GHCR chiffré (secrets/ghcr-pull-secret.yaml),
+# déposé dans argocd_namespace par la tâche ghcr-pull-secret. Layout sibling
+# standard par défaut, surchargeable (-e control_plane_root=...).
+control_plane_root: "{{ playbook_dir }}/../../control-plane"
+ghcr_pull_secret_file: "{{ control_plane_root }}/secrets/ghcr-pull-secret.yaml"
