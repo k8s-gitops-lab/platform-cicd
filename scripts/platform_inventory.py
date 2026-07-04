@@ -13,9 +13,6 @@ _PLATFORM_DEFAULTS = {
     "registry": {"host": "ghcr.io/k8s-gitops-lab"},
 }
 
-_GITLAB_APPS_NAMESPACE = "infra"
-
-
 def default_apps_file() -> Path:
     gitops_root = os.environ.get("GITOPS_REPO_ROOT")
     if gitops_root:
@@ -58,6 +55,7 @@ def _normalize_app(app: dict, inventory: dict, pconst: dict) -> dict:
     """Expand minimum-format app to full format by convention."""
     app = dict(app)
     name = app["name"]
+    group = app["group"]
     gitlab_host = inventory.get("gitlab", {}).get("internalHost", "")
     domain = pconst["domain"]
     registry_host = pconst["registry"]["host"]
@@ -73,7 +71,7 @@ def _normalize_app(app: dict, inventory: dict, pconst: dict) -> dict:
     # manifests: projectPath and projectName derived from name
     manifests = dict(app.get("manifests", {}))
     if "projectPath" not in manifests:
-        manifests["projectPath"] = f"{_GITLAB_APPS_NAMESPACE}/{name}-iac"
+        manifests["projectPath"] = f"{group}/{name}-iac"
     if "projectName" not in manifests:
         manifests["projectName"] = f"{name}-iac"
     # repoURL (user-facing, external GitLab or source repo) derived if absent
@@ -94,7 +92,7 @@ def _normalize_app(app: dict, inventory: dict, pconst: dict) -> dict:
     # code: repoURL (user-facing, external GitLab) and localPath derived if absent
     code = dict(app.get("code", {}))
     if "projectPath" not in code:
-        code["projectPath"] = f"{_GITLAB_APPS_NAMESPACE}/{name}"
+        code["projectPath"] = f"{group}/{name}"
     if "projectName" not in code:
         code["projectName"] = name
     if "repoURL" not in code:
