@@ -62,6 +62,8 @@ et renseignés par `gitlab-dex-oauth-app.py`.
 Il n'y a pas de registry Docker interne au cluster. Les images buildées par
 Kaniko sont poussées vers GHCR (`ghcr.io/k8s-gitops-lab/<app>`, voir
 `control-plane/platform.yml`). Les Deployments applicatifs tirent l'image
-directement depuis GHCR ; le secret de pull (`ghcr-pull-secret`, déployé par
-`control-plane` puis recopié par app via `render-argocd-apps.py`) est
-consommé par les `Deployment` générés dans chaque namespace applicatif.
+directement depuis GHCR ; le secret de pull source (`ghcr-pull-secret`,
+chiffré SOPS dans `platform-gitops/flux-secrets/` et déposé par Flux) est
+distribué sous le nom `ghcr-pull` par External Secrets Operator dans chaque
+namespace applicatif labellisé (`render-argocd-apps.py` pose le label), où il
+est consommé par les `Deployment` générés.

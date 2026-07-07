@@ -19,9 +19,3 @@ argocd_url: "https://argocd.{{ gitlab_domain }}"
 platform_cicd_root: "{{ playbook_dir }}/.."
 argocd_install_filter: "{{ platform_cicd_root }}/scripts/filter-argocd-install.py"
 argocd_install_url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
-
-# control-plane porte le secret GHCR chiffré (secrets/ghcr-pull-secret.yaml),
-# déposé dans argocd_namespace par la tâche ghcr-pull-secret. Layout sibling
-# standard par défaut, surchargeable (-e control_plane_root=...).
-control_plane_root: "{{ playbook_dir }}/../../control-plane"
-ghcr_pull_secret_file: "{{ control_plane_root }}/secrets/ghcr-pull-secret.yaml"

@@ -12,13 +12,25 @@ import yaml
 
 from platform_inventory import default_apps_file, load_inventory, platform_constants
 
-# Secret dockerconfigjson source, deploye une seule fois par `make ghcr-pull-secret`
-# (control-plane). Les Jobs generes ci-dessous le recopient dans chaque namespace
-# applicatif: ArgoCD ne sait pas dechiffrer SOPS nativement (contrairement a Flux),
-# donc un seul secret chiffre sert de source et le reste passe par kubectl.
-_GHCR_SOURCE_NAMESPACE = "argocd"
-_GHCR_SOURCE_SECRET = "ghcr-pull-secret"
-_GHCR_TARGET_SECRET = "ghcr-pull"
+# Distribution des secrets entierement declarative (External Secrets Operator,
+# installe par platform-gitops argocd/managed/external-secrets.yaml) :
+# - le secret source GHCR (argocd/ghcr-pull-secret) est depose par Flux depuis
+#   platform-gitops/flux-secrets/ (dechiffrement SOPS) ;
+# - la ClusterExternalSecret ghcr-pull (argocd/platform/secrets-distribution)
+#   le recopie sous le nom ghcr-pull dans tout namespace portant le label
+#   ci-dessous, pose ici sur les namespaces d'environnement ;
+# - un ExternalSecret par app (genere ci-dessous) fabrique le secret
+#   repository ArgoCD a partir du mot de passe root GitLab.
+_GHCR_PULL_LABEL = "k8s-gitops-lab.io/ghcr-pull"
+_GITLAB_SECRET_STORE = "gitlab-secrets"
+_GITLAB_ROOT_PASSWORD_SECRET = "gitlab-gitlab-initial-root-password"
+
+# Les CR ExternalSecret dependent des CRD posees par l'Application
+# external-secrets : les Applications reessaient jusqu'a convergence.
+_SYNC_RETRY = {
+    "limit": 10,
+    "backoff": {"duration": "30s", "factor": 2, "maxDuration": "5m"},
+}
 
 
 def app_project(app: dict) -> dict:
@@ -76,6 +88,7 @@ def applicationset(app: dict) -> dict:
                     "syncPolicy": {
                         "automated": {"prune": True, "selfHeal": True},
                         "syncOptions": ["CreateNamespace=true"],
+                        "retry": _SYNC_RETRY,
                     },
                 },
             },
@@ -83,240 +96,56 @@ def applicationset(app: dict) -> dict:
     }
 
 
-def repo_creds(app: dict) -> list[dict]:
-    name = app["name"]
-    sa = f"gitlab-iac-repo-creds-{name}"
-    read_role = f"{sa}-read"
-    write_role = f"{sa}-write"
+def repo_creds(app: dict) -> dict:
     secret_name = app["manifests"]["argocdSecretName"]
     repo_url = app["manifests"]["argocdRepoURL"]
-    annotations = {"argocd.argoproj.io/sync-wave": "2"}
+    return {
+        "apiVersion": "external-secrets.io/v1",
+        "kind": "ExternalSecret",
+        "metadata": {
+            "name": secret_name,
+            "namespace": "argocd",
+            "annotations": {"argocd.argoproj.io/sync-wave": "2"},
+        },
+        "spec": {
+            "refreshInterval": "1h",
+            "secretStoreRef": {"kind": "ClusterSecretStore", "name": _GITLAB_SECRET_STORE},
+            "target": {
+                "name": secret_name,
+                "creationPolicy": "Owner",
+                "template": {
+                    "metadata": {"labels": {"argocd.argoproj.io/secret-type": "repository"}},
+                    "data": {
+                        "type": "git",
+                        "url": repo_url,
+                        "username": "root",
+                        "password": "{{ .password }}",
+                    },
+                },
+            },
+            "data": [
+                {
+                    "secretKey": "password",
+                    "remoteRef": {"key": _GITLAB_ROOT_PASSWORD_SECRET, "property": "password"},
+                }
+            ],
+        },
+    }
+
+
+def app_namespaces(app: dict) -> list[dict]:
     return [
         {
             "apiVersion": "v1",
-            "kind": "ServiceAccount",
-            "metadata": {"name": sa, "namespace": "argocd", "annotations": annotations},
-        },
-        {
-            "apiVersion": "rbac.authorization.k8s.io/v1",
-            "kind": "Role",
-            "metadata": {"name": read_role, "namespace": "gitlab", "annotations": annotations},
-            "rules": [
-                {
-                    "apiGroups": [""],
-                    "resources": ["secrets"],
-                    "resourceNames": ["gitlab-gitlab-initial-root-password"],
-                    "verbs": ["get"],
-                }
-            ],
-        },
-        {
-            "apiVersion": "rbac.authorization.k8s.io/v1",
-            "kind": "RoleBinding",
-            "metadata": {"name": read_role, "namespace": "gitlab", "annotations": annotations},
-            "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": read_role},
-            "subjects": [{"kind": "ServiceAccount", "name": sa, "namespace": "argocd"}],
-        },
-        {
-            "apiVersion": "rbac.authorization.k8s.io/v1",
-            "kind": "Role",
-            "metadata": {"name": write_role, "namespace": "argocd", "annotations": annotations},
-            "rules": [
-                {
-                    "apiGroups": [""],
-                    "resources": ["secrets"],
-                    "resourceNames": [secret_name],
-                    "verbs": ["get", "patch"],
-                },
-                {"apiGroups": [""], "resources": ["secrets"], "verbs": ["create"]},
-            ],
-        },
-        {
-            "apiVersion": "rbac.authorization.k8s.io/v1",
-            "kind": "RoleBinding",
-            "metadata": {"name": write_role, "namespace": "argocd", "annotations": annotations},
-            "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": write_role},
-            "subjects": [{"kind": "ServiceAccount", "name": sa, "namespace": "argocd"}],
-        },
-        {
-            "apiVersion": "batch/v1",
-            "kind": "Job",
+            "kind": "Namespace",
             "metadata": {
-                "name": sa,
-                "namespace": "argocd",
-                "annotations": {
-                    "argocd.argoproj.io/hook": "Sync",
-                    "argocd.argoproj.io/sync-wave": "2",
-                    "argocd.argoproj.io/hook-delete-policy": "BeforeHookCreation,HookSucceeded",
-                },
+                "name": env["namespace"],
+                "labels": {_GHCR_PULL_LABEL: "enabled"},
+                "annotations": {"argocd.argoproj.io/sync-wave": "0"},
             },
-            "spec": {
-                "backoffLimit": 2,
-                "template": {
-                    "spec": {
-                        "serviceAccountName": sa,
-                        "restartPolicy": "Never",
-                        "containers": [
-                            {
-                                "name": "create-secret",
-                                "image": "registry.gitlab.com/gitlab-org/build/cng/kubectl:v18.11.5",
-                                "imagePullPolicy": "IfNotPresent",
-                                "command": [
-                                    "/bin/sh",
-                                    "-ec",
-                                    repo_creds_script(secret_name, repo_url),
-                                ],
-                            }
-                        ],
-                    }
-                },
-            },
-        },
+        }
+        for env in app["environments"]
     ]
-
-
-def repo_creds_script(secret_name: str, repo_url: str) -> str:
-    return f"""\
-for i in $(seq 1 120); do
-  if kubectl -n gitlab get secret gitlab-gitlab-initial-root-password >/dev/null 2>&1; then
-    break
-  fi
-  sleep 5
-done
-
-password=$(
-  kubectl -n gitlab get secret gitlab-gitlab-initial-root-password \\
-    -o jsonpath='{{.data.password}}' | base64 -d
-)
-
-kubectl -n argocd create secret generic {secret_name} \\
-  --from-literal=type=git \\
-  --from-literal=url={repo_url} \\
-  --from-literal=username=root \\
-  --from-literal=password="$password" \\
-  --dry-run=client -o yaml \\
-  | kubectl -n argocd label -f - argocd.argoproj.io/secret-type=repository --local -o yaml \\
-  | kubectl apply -f -
-"""
-
-
-def ghcr_pull_secret(app: dict) -> list[dict]:
-    name = app["name"]
-    sa = f"ghcr-pull-{name}"
-    read_role = f"{sa}-read"
-    ns_annotations = {"argocd.argoproj.io/sync-wave": "0"}
-    rbac_annotations = {"argocd.argoproj.io/sync-wave": "1"}
-    resources = [
-        {
-            "apiVersion": "v1",
-            "kind": "ServiceAccount",
-            "metadata": {"name": sa, "namespace": _GHCR_SOURCE_NAMESPACE, "annotations": rbac_annotations},
-        },
-        {
-            "apiVersion": "rbac.authorization.k8s.io/v1",
-            "kind": "Role",
-            "metadata": {"name": read_role, "namespace": _GHCR_SOURCE_NAMESPACE, "annotations": rbac_annotations},
-            "rules": [
-                {
-                    "apiGroups": [""],
-                    "resources": ["secrets"],
-                    "resourceNames": [_GHCR_SOURCE_SECRET],
-                    "verbs": ["get"],
-                }
-            ],
-        },
-        {
-            "apiVersion": "rbac.authorization.k8s.io/v1",
-            "kind": "RoleBinding",
-            "metadata": {"name": read_role, "namespace": _GHCR_SOURCE_NAMESPACE, "annotations": rbac_annotations},
-            "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": read_role},
-            "subjects": [{"kind": "ServiceAccount", "name": sa, "namespace": _GHCR_SOURCE_NAMESPACE}],
-        },
-    ]
-
-    for env in app["environments"]:
-        namespace = env["namespace"]
-        write_role = f"{sa}-{env['name']}-write"
-        resources.extend(
-            [
-                {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": namespace, "annotations": ns_annotations}},
-                {
-                    "apiVersion": "rbac.authorization.k8s.io/v1",
-                    "kind": "Role",
-                    "metadata": {"name": write_role, "namespace": namespace, "annotations": rbac_annotations},
-                    "rules": [
-                        {
-                            "apiGroups": [""],
-                            "resources": ["secrets"],
-                            "resourceNames": [_GHCR_TARGET_SECRET],
-                            "verbs": ["get", "patch"],
-                        },
-                        {"apiGroups": [""], "resources": ["secrets"], "verbs": ["create"]},
-                    ],
-                },
-                {
-                    "apiVersion": "rbac.authorization.k8s.io/v1",
-                    "kind": "RoleBinding",
-                    "metadata": {"name": write_role, "namespace": namespace, "annotations": rbac_annotations},
-                    "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": write_role},
-                    "subjects": [{"kind": "ServiceAccount", "name": sa, "namespace": _GHCR_SOURCE_NAMESPACE}],
-                },
-                {
-                    "apiVersion": "batch/v1",
-                    "kind": "Job",
-                    "metadata": {
-                        "name": f"{sa}-{env['name']}",
-                        "namespace": _GHCR_SOURCE_NAMESPACE,
-                        "annotations": {
-                            "argocd.argoproj.io/hook": "Sync",
-                            "argocd.argoproj.io/sync-wave": "1",
-                            "argocd.argoproj.io/hook-delete-policy": "BeforeHookCreation,HookSucceeded",
-                        },
-                    },
-                    "spec": {
-                        "backoffLimit": 2,
-                        "template": {
-                            "spec": {
-                                "serviceAccountName": sa,
-                                "restartPolicy": "Never",
-                                "containers": [
-                                    {
-                                        "name": "copy-secret",
-                                        "image": "registry.gitlab.com/gitlab-org/build/cng/kubectl:v18.11.5",
-                                        "imagePullPolicy": "IfNotPresent",
-                                        "command": ["/bin/sh", "-ec", ghcr_copy_script(namespace)],
-                                    }
-                                ],
-                            }
-                        },
-                    },
-                },
-            ]
-        )
-
-    return resources
-
-
-def ghcr_copy_script(namespace: str) -> str:
-    return f"""\
-for i in $(seq 1 60); do
-  if kubectl -n {_GHCR_SOURCE_NAMESPACE} get secret {_GHCR_SOURCE_SECRET} >/dev/null 2>&1; then
-    break
-  fi
-  sleep 5
-done
-
-dockerconfig=$(
-  kubectl -n {_GHCR_SOURCE_NAMESPACE} get secret {_GHCR_SOURCE_SECRET} \\
-    -o jsonpath='{{.data.\\.dockerconfigjson}}' | base64 -d
-)
-
-kubectl -n {namespace} create secret generic {_GHCR_TARGET_SECRET} \\
-  --type=kubernetes.io/dockerconfigjson \\
-  --from-literal=.dockerconfigjson="$dockerconfig" \\
-  --dry-run=client -o yaml \\
-  | kubectl apply -f -
-"""
 
 
 def root_appset(pconst: dict) -> dict:
@@ -356,6 +185,7 @@ def root_appset(pconst: dict) -> dict:
                     "syncPolicy": {
                         "automated": {"prune": True, "selfHeal": True},
                         "syncOptions": ["CreateNamespace=true"],
+                        "retry": _SYNC_RETRY,
                     },
                 },
             },
@@ -388,7 +218,7 @@ def render(apps_file: Path, output_dir: Path, managed_file: Path) -> None:
         app_dir.mkdir()
         write_yaml(app_dir / "app-project.yaml", app_project(app))
         write_yaml(app_dir / "applicationset.yaml", applicationset(app))
-        write_yaml(app_dir / "ghcr-pull-secret.yaml", ghcr_pull_secret(app))
+        write_yaml(app_dir / "namespaces.yaml", app_namespaces(app))
         write_yaml(app_dir / "repo-creds.yaml", repo_creds(app))
         write_yaml(
             app_dir / "kustomization.yaml",
@@ -398,7 +228,7 @@ def render(apps_file: Path, output_dir: Path, managed_file: Path) -> None:
                 "resources": [
                     "app-project.yaml",
                     "applicationset.yaml",
-                    "ghcr-pull-secret.yaml",
+                    "namespaces.yaml",
                     "repo-creds.yaml",
                 ],
             },

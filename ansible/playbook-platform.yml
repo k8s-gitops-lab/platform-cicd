@@ -4,11 +4,3 @@
   gather_facts: false
   roles:
     - role: platform_bootstrap
-  tasks:
-    # Hors sequence platform_bootstrap/tasks/main.yml (donc hors du --tags par
-    # defaut de `platform-cicd make bootstrap`) : depose le secret source GHCR
-    # depuis control-plane, invoque uniquement par `control-plane make
-    # ghcr-pull-secret` via --tags ghcr-pull-secret.
-    - name: Déposer le secret source GHCR dans argocd
-      tags: [ghcr-pull-secret]
-      ansible.builtin.import_tasks: roles/platform_bootstrap/tasks/ghcr-pull-secret.yml
