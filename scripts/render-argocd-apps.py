@@ -47,52 +47,18 @@ def app_project(app: dict) -> dict:
     }
 
 
-def applicationset(app: dict) -> dict:
-    elements = [
-        {
-            "app": app["name"],
-            "project": app["argocd"]["project"],
-            "env": env["name"],
-            "branch": env["branch"],
-            "namespace": env["namespace"],
-            "repoURL": app["manifests"]["argocdRepoURL"],
-            "path": app["manifests"]["path"],
-        }
-        for env in app["environments"]
-    ]
+def app_data(app: dict) -> dict:
+    """Donnees lues directement par app-envs-appset.yaml (git files generator) :
+    pas un manifest k8s, jamais liste dans kustomization.yaml."""
     return {
-        "apiVersion": "argoproj.io/v1alpha1",
-        "kind": "ApplicationSet",
-        "metadata": {"name": app["name"], "namespace": "argocd"},
-        "spec": {
-            "goTemplate": True,
-            "goTemplateOptions": ["missingkey=error"],
-            "generators": [{"list": {"elements": elements}}],
-            "template": {
-                "metadata": {
-                    "name": "{{ .app }}-{{ .env }}",
-                    "namespace": "argocd",
-                    "finalizers": ["resources-finalizer.argocd.argoproj.io"],
-                },
-                "spec": {
-                    "project": "{{ .project }}",
-                    "source": {
-                        "repoURL": "{{ .repoURL }}",
-                        "targetRevision": "{{ .branch }}",
-                        "path": "{{ .path }}",
-                    },
-                    "destination": {
-                        "server": "https://kubernetes.default.svc",
-                        "namespace": "{{ .namespace }}",
-                    },
-                    "syncPolicy": {
-                        "automated": {"prune": True, "selfHeal": True},
-                        "syncOptions": ["CreateNamespace=true"],
-                        "retry": _SYNC_RETRY,
-                    },
-                },
-            },
-        },
+        "app": app["name"],
+        "project": app["argocd"]["project"],
+        "repoURL": app["manifests"]["argocdRepoURL"],
+        "path": app["manifests"]["path"],
+        "environments": [
+            {"name": env["name"], "branch": env["branch"], "namespace": env["namespace"]}
+            for env in app["environments"]
+        ],
     }
 
 
@@ -193,6 +159,61 @@ def root_appset(pconst: dict) -> dict:
     }
 
 
+def app_envs_appset(pconst: dict) -> dict:
+    """Un seul ApplicationSet pour tous les environnements de toutes les apps :
+    Matrix(git files sur app-data.yaml de chaque app x list derive de son champ
+    environments) remplace l'ApplicationSet par app genere precedemment."""
+    return {
+        "apiVersion": "argoproj.io/v1alpha1",
+        "kind": "ApplicationSet",
+        "metadata": {"name": "app-envs", "namespace": "argocd"},
+        "spec": {
+            "goTemplate": True,
+            "goTemplateOptions": ["missingkey=error"],
+            "generators": [
+                {
+                    "matrix": {
+                        "generators": [
+                            {
+                                "git": {
+                                    "repoURL": pconst["repoURL"],
+                                    "revision": pconst["targetRevision"],
+                                    "files": [{"path": "argocd/generated/apps/*/app-data.yaml"}],
+                                }
+                            },
+                            {"list": {"elementsYaml": "{{ .environments | toJson }}"}},
+                        ]
+                    }
+                }
+            ],
+            "template": {
+                "metadata": {
+                    "name": "{{ .app }}-{{ .name }}",
+                    "namespace": "argocd",
+                    "finalizers": ["resources-finalizer.argocd.argoproj.io"],
+                },
+                "spec": {
+                    "project": "{{ .project }}",
+                    "source": {
+                        "repoURL": "{{ .repoURL }}",
+                        "targetRevision": "{{ .branch }}",
+                        "path": "{{ .path }}",
+                    },
+                    "destination": {
+                        "server": "https://kubernetes.default.svc",
+                        "namespace": "{{ .namespace }}",
+                    },
+                    "syncPolicy": {
+                        "automated": {"prune": True, "selfHeal": True},
+                        "syncOptions": ["CreateNamespace=true"],
+                        "retry": _SYNC_RETRY,
+                    },
+                },
+            },
+        },
+    }
+
+
 def write_yaml(path: Path, docs: dict | list[dict]) -> None:
     documents = docs if isinstance(docs, list) else [docs]
     path.write_text(
@@ -204,7 +225,7 @@ def write_yaml(path: Path, docs: dict | list[dict]) -> None:
     )
 
 
-def render(apps_file: Path, output_dir: Path, managed_file: Path) -> None:
+def render(apps_file: Path, output_dir: Path, apps_appset_file: Path, app_envs_appset_file: Path) -> None:
     inventory = load_inventory(apps_file)
     pconst = platform_constants(inventory)
 
@@ -217,9 +238,11 @@ def render(apps_file: Path, output_dir: Path, managed_file: Path) -> None:
         app_dir = output_dir / app["name"]
         app_dir.mkdir()
         write_yaml(app_dir / "app-project.yaml", app_project(app))
-        write_yaml(app_dir / "applicationset.yaml", applicationset(app))
         write_yaml(app_dir / "namespaces.yaml", app_namespaces(app))
         write_yaml(app_dir / "repo-creds.yaml", repo_creds(app))
+        # app-data.yaml : pas un manifest, lu directement par app-envs-appset.yaml
+        # (git files generator) ; volontairement absent de kustomization.yaml.
+        write_yaml(app_dir / "app-data.yaml", app_data(app))
         write_yaml(
             app_dir / "kustomization.yaml",
             {
@@ -227,15 +250,16 @@ def render(apps_file: Path, output_dir: Path, managed_file: Path) -> None:
                 "kind": "Kustomization",
                 "resources": [
                     "app-project.yaml",
-                    "applicationset.yaml",
                     "namespaces.yaml",
                     "repo-creds.yaml",
                 ],
             },
         )
 
-    managed_file.parent.mkdir(parents=True, exist_ok=True)
-    write_yaml(managed_file, root_appset(pconst))
+    apps_appset_file.parent.mkdir(parents=True, exist_ok=True)
+    write_yaml(apps_appset_file, root_appset(pconst))
+    app_envs_appset_file.parent.mkdir(parents=True, exist_ok=True)
+    write_yaml(app_envs_appset_file, app_envs_appset(pconst))
 
 
 def same_tree(left: Path, right: Path) -> bool:
@@ -244,15 +268,20 @@ def same_tree(left: Path, right: Path) -> bool:
     return left_files == right_files and all((left / p).read_bytes() == (right / p).read_bytes() for p in left_files)
 
 
-def check(apps_file: Path, output_dir: Path, managed_file: Path) -> int:
+def check(apps_file: Path, output_dir: Path, apps_appset_file: Path, app_envs_appset_file: Path) -> int:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_root = Path(tmp)
         tmp_output = tmp_root / "generated/apps"
-        tmp_managed = tmp_root / "managed/apps-appset.yaml"
-        render(apps_file, tmp_output, tmp_managed)
-        if not managed_file.exists() or managed_file.read_bytes() != tmp_managed.read_bytes():
-            print(f"{managed_file} n'est pas à jour. Lancez: make argocd-apps-render", file=sys.stderr)
-            return 1
+        tmp_apps_appset = tmp_root / "managed/apps-appset.yaml"
+        tmp_app_envs_appset = tmp_root / "managed/app-envs-appset.yaml"
+        render(apps_file, tmp_output, tmp_apps_appset, tmp_app_envs_appset)
+        for managed_file, tmp_managed in (
+            (apps_appset_file, tmp_apps_appset),
+            (app_envs_appset_file, tmp_app_envs_appset),
+        ):
+            if not managed_file.exists() or managed_file.read_bytes() != tmp_managed.read_bytes():
+                print(f"{managed_file} n'est pas à jour. Lancez: make argocd-apps-render", file=sys.stderr)
+                return 1
         if not output_dir.exists() or not same_tree(output_dir, tmp_output):
             print(f"{output_dir} n'est pas à jour. Lancez: make argocd-apps-render", file=sys.stderr)
             return 1
@@ -268,11 +297,12 @@ def main() -> int:
     apps_file = args.apps_file.resolve()
     gitops_root = apps_file.parents[1]
     output_dir = gitops_root / "argocd/generated/apps"
-    managed_file = gitops_root / "argocd/managed/apps-appset.yaml"
+    apps_appset_file = gitops_root / "argocd/managed/apps-appset.yaml"
+    app_envs_appset_file = gitops_root / "argocd/managed/app-envs-appset.yaml"
 
     if args.check:
-        return check(apps_file, output_dir, managed_file)
-    render(apps_file, output_dir, managed_file)
+        return check(apps_file, output_dir, apps_appset_file, app_envs_appset_file)
+    render(apps_file, output_dir, apps_appset_file, app_envs_appset_file)
     return 0
 
 
