@@ -1,4 +1,4 @@
-# platform-cicd
+# platform-bootstrap
 
 Bootstrap technique de la plateforme applicative du POC : installe ArgoCD,
 puis attend que GitLab (déployé déclarativement par ArgoCD depuis
@@ -12,7 +12,7 @@ cluster. La configuration suivie en continu par ArgoCD vit dans le repo frere
 
 ## Prerequis
 
-- Un cluster Kubernetes deja provisionne par `infrastructure` (Traefik,
+- Un cluster Kubernetes deja provisionne par `infra-iac` (Traefik,
   Gateway API, MetalLB actifs).
 - `ansible-playbook` dans le PATH (le role de bootstrap `platform_bootstrap`
   vit dans `ansible/` de ce depot).

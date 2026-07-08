@@ -16,7 +16,7 @@ spec:
   project: default
   source:
     # Depot source GitOps. GitLab interne est alimente/importé ensuite pour les
-    # depots runtime de la plateforme (voir control-plane/docs/source-control.md).
+    # depots runtime de la plateforme (voir cockpit/docs/source-control.md).
     repoURL: https://github.com/k8s-gitops-lab/platform-gitops
     targetRevision: main
     path: argocd/managed

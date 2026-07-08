@@ -1,4 +1,4 @@
-# Spec technique — platform-cicd
+# Spec technique — platform-bootstrap
 
 ## Structure du dépôt
 

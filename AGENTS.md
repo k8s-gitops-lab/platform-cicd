@@ -1,8 +1,8 @@
-# AGENTS.md — platform-cicd
+# AGENTS.md — platform-bootstrap
 
 ## Rôle du dépôt
 
-`platform-cicd` installe ArgoCD sur le cluster Kubernetes, puis applique le
+`platform-bootstrap` installe ArgoCD sur le cluster Kubernetes, puis applique le
 root Application "app of apps" qui délègue à ArgoCD le déploiement
 déclaratif de GitLab et des autres add-ons depuis `platform-gitops`. Ce
 dépôt attend ensuite que GitLab soit prêt pour configurer ses credentials
@@ -17,7 +17,7 @@ Une fois le bootstrap effectué, ArgoCD gère la plateforme en continu depuis
   aucune collection externe requise). Les étapes ArgoCD/Flux/GitLab du
   bootstrap vivent dans le rôle `platform_bootstrap` de `ansible/roles/` de
   ce dépôt.
-- Le cluster doit avoir été provisionné par `infrastructure` (Traefik,
+- Le cluster doit avoir été provisionné par `infra-iac` (Traefik,
   Gateway API, MetalLB actifs).
 
 ## Commandes principales
@@ -60,7 +60,7 @@ fixe explicitement à `$(CURDIR)`).
 
 ## Ordre de préférence pour le déploiement
 
-Cf. la règle générale dans `control-plane/AGENTS.md` : ressource TF/Kubernetes
+Cf. la règle générale dans `cockpit/AGENTS.md` : ressource TF/Kubernetes
 déclarative d'abord, sinon Ansible, et Make seulement en dernier recours comme
 point d'entrée/enchaînement — y compris pour l'orchestration de plusieurs
 étapes (séquence, reprise après échec), qui doit rester dans Ansible plutôt

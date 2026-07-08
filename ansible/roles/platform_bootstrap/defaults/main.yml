@@ -11,7 +11,7 @@ gitlab_ready_timeout: 600
 gitlab_url: "https://gitlab.{{ gitlab_domain }}"
 argocd_url: "https://argocd.{{ gitlab_domain }}"
 
-# Ce rôle vit dans platform-cicd/ansible/ : platform_cicd_root pointe donc
+# Ce rôle vit dans platform-bootstrap/ansible/ : platform_cicd_root pointe donc
 # simplement sur la racine du dépôt courant (un niveau au-dessus de ansible/),
 # où vivent les scripts Python et manifests ArgoCD (argocd/, scripts/)
 # consommés par ce rôle. Surchargeable (-e platform_cicd_root=...) si

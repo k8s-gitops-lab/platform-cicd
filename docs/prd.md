@@ -1,8 +1,8 @@
-# PRD — platform-cicd
+# PRD — platform-bootstrap
 
 > Vision et périmètre de ce dépôt : le bootstrap de la plateforme. La vision
 > globale du POC (intention, scaling, limites acceptées) vit dans
-> [`control-plane/docs/prd.md`](../../control-plane/docs/prd.md).
+> [`cockpit/docs/prd.md`](../../cockpit/docs/prd.md).
 
 ## Intention du projet
 
@@ -10,7 +10,7 @@ Ce dépôt porte le bootstrap et la maintenance d'une chaîne CI/CD complète,
 autohébergée sur un cluster Kubernetes local. L'objectif est de démontrer un
 pattern reproductible couvrant :
 
-- un cluster Kubernetes local reproductible (`infrastructure`) ;
+- un cluster Kubernetes local reproductible (`infra-iac`) ;
 - une plateforme GitOps pilotée par ArgoCD, avec GitLab et un runner CI
   déployés déclarativement depuis `platform-gitops` ;
 - un template CI partagé et versionné (`ci-templates`) utilisable sans
@@ -71,7 +71,7 @@ Aucune duplication de logique CI, aucune configuration ArgoCD manuelle, aucune
 
 Les limites globales du POC (protection des branches manifests, portée du
 token `GITLAB_PUSH_TOKEN`) sont détaillées dans
-[`control-plane/docs/prd.md`](../../control-plane/docs/prd.md#limites-acceptées-non-objectifs-explicites-du-poc).
+[`cockpit/docs/prd.md`](../../cockpit/docs/prd.md#limites-acceptées-non-objectifs-explicites-du-poc).
 S'y ajoutent, propres à ce dépôt :
 
 - **TLS auto-signé** : les scripts désactivent la vérification TLS par défaut

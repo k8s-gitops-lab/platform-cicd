@@ -42,7 +42,7 @@ help: ## Affiche cette aide
 
 bootstrap: ## Deploie la plateforme sur le contexte Kubernetes courant (un seul ansible-playbook), relancable avec START_AT=<etape>
 	@tags=$$(python3 ./scripts/bootstrap-tags.py --start-at "$(START_AT)" --stop-after "$(STOP_AFTER)" --tasks-file "$(BOOTSTRAP_TASKS_FILE)"); \
-	echo "==> platform-cicd: bootstrap (ansible) --tags $$tags"; \
+	echo "==> platform-bootstrap: bootstrap (ansible) --tags $$tags"; \
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags "$$tags" $(ANSIBLE_VARS)
 	@echo ""
 	@echo "Plateforme prete."
@@ -54,23 +54,23 @@ bootstrap-from-%: ## Reprend le bootstrap depuis une etape donnee
 	$(MAKE) bootstrap START_AT=$*
 
 argocd-install: ## Installe ArgoCD dans le cluster courant
-	@echo "==> platform-cicd: argocd-install (ansible)"
+	@echo "==> platform-bootstrap: argocd-install (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags argocd-install $(ANSIBLE_VARS)
 
 argocd-bootstrap: ## Applique le root Application ArgoCD
-	@echo "==> platform-cicd: argocd-bootstrap (ansible)"
+	@echo "==> platform-bootstrap: argocd-bootstrap (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags argocd-bootstrap $(ANSIBLE_VARS)
 
 argocd-trust-corporate-ca: ## Cree le ConfigMap CA corporate pour argocd-repo-server (macOS)
-	@echo "==> platform-cicd: argocd-trust-corporate-ca (ansible)"
+	@echo "==> platform-bootstrap: argocd-trust-corporate-ca (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags argocd-trust-corporate-ca $(ANSIBLE_VARS)
 
 argocd-trust-local-gateway-ca: ## Cree le ConfigMap CA local pour Dex/GitLab OAuth
-	@echo "==> platform-cicd: argocd-trust-local-gateway-ca (ansible)"
+	@echo "==> platform-bootstrap: argocd-trust-local-gateway-ca (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags argocd-trust-local-gateway-ca $(ANSIBLE_VARS)
 
 argocd-ingress: ## Configure ArgoCD en HTTP (bootstrap uniquement ; server.insecure est ensuite maintenu par l'Application argocd-config)
-	@echo "==> platform-cicd: argocd-ingress (ansible)"
+	@echo "==> platform-bootstrap: argocd-ingress (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags argocd-ingress $(ANSIBLE_VARS)
 
 argocd-password: ## Affiche le mot de passe admin initial d'ArgoCD
@@ -90,15 +90,15 @@ gitlab-status: ## Affiche l'etat GitLab
 	@kubectl -n $(GITLAB_NAMESPACE) get pods
 
 gitlab-tf-credentials: ## Cree le PAT GitLab et le Secret K8s consomme par Terraform
-	@echo "==> platform-cicd: gitlab-tf-credentials (ansible)"
+	@echo "==> platform-bootstrap: gitlab-tf-credentials (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-tf-credentials $(ANSIBLE_VARS)
 
 gitlab-dex-oauth-app: ## Cree l'application OAuth GitLab pour Dex et renseigne argocd-secret
-	@echo "==> platform-cicd: gitlab-dex-oauth-app (ansible)"
+	@echo "==> platform-bootstrap: gitlab-dex-oauth-app (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-dex-oauth-app $(ANSIBLE_VARS)
 
 gitlab-runner-token: ## Cree le Secret K8s du token runner
-	@echo "==> platform-cicd: gitlab-runner-token (ansible)"
+	@echo "==> platform-bootstrap: gitlab-runner-token (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-runner-token $(ANSIBLE_VARS)
 
 argocd-apps-render: ## Genere les manifests ArgoCD depuis argocd/apps/<app>/app.yaml
@@ -112,7 +112,7 @@ init-project: ## Deprecated: creer argocd/apps/<app>.yaml directement
 	@exit 1
 
 flux-sops-age: ## Injecte la cle age privee dans flux-system pour le dechiffrement SOPS (bootstrap uniquement)
-	@echo "==> platform-cicd: flux-sops-age (ansible)"
+	@echo "==> platform-bootstrap: flux-sops-age (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags flux-sops-age $(ANSIBLE_VARS)
 
 status: ## Affiche l'etat des Applications ArgoCD

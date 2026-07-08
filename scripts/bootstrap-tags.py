@@ -7,7 +7,7 @@ sous-ensemble d'etapes (START_AT/STOP_AFTER) a passer en --tags.
 
 L'ordre des etapes n'est plus recopie a la main ici : il est lu directement
 depuis le tag de chaque tache de premier niveau du role platform_bootstrap
-(infrastructure/ansible/roles/platform_bootstrap/tasks/main.yml), qui reste
+(infra-iac/ansible/roles/platform_bootstrap/tasks/main.yml), qui reste
 l'unique source de verite pour l'ordre d'execution reel.
 """
 from __future__ import annotations
