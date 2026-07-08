@@ -5,9 +5,15 @@
     --timeout={{ argocd_wait_timeout }}
   changed_when: false
 
+- name: Rendre argocd/root-app.yaml (gitops_repo_url)
+  ansible.builtin.template:
+    src: "{{ platform_cicd_root }}/argocd/root-app.yaml"
+    dest: /tmp/root-app.yaml
+    mode: '0440'
+
 - name: Appliquer argocd/root-app.yaml
   ansible.builtin.command: >-
     kubectl apply -n {{ argocd_namespace }}
-    -f {{ platform_cicd_root }}/argocd/root-app.yaml
+    -f /tmp/root-app.yaml
   register: root_app_apply
   changed_when: "'unchanged' not in root_app_apply.stdout"

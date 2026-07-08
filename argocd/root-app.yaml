@@ -5,6 +5,11 @@
 # et les ApplicationSets applicatifs ajoutés dynamiquement. Les add-ons cluster
 # bas niveau (Gateway API, MetalLB, Traefik, Gateway partagée) sont provisionnés
 # par Ansible avant ArgoCD.
+#
+# Templatise (rendu par argocd-bootstrap.yml via ansible.builtin.template) :
+# repoURL vient de la variable gitops_repo_url, pas d'une valeur figee ici --
+# ce depot ne doit pas dependre du contenu de platform-gitops, seulement de sa
+# configuration (cf. cockpit/docs/repo-map.md, diagramme de dependances).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -17,7 +22,7 @@ spec:
   source:
     # Depot source GitOps. GitLab interne est alimente/importé ensuite pour les
     # depots runtime de la plateforme (voir cockpit/docs/source-control.md).
-    repoURL: https://github.com/k8s-gitops-lab/platform-gitops
+    repoURL: {{ gitops_repo_url }}
     targetRevision: main
     path: argocd/managed
   destination:

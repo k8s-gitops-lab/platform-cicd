@@ -19,3 +19,9 @@ argocd_url: "https://argocd.{{ gitlab_domain }}"
 platform_cicd_root: "{{ playbook_dir }}/.."
 argocd_install_filter: "{{ platform_cicd_root }}/scripts/filter-argocd-install.py"
 argocd_install_url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
+
+# Repo GitOps que le root Application ArgoCD doit suivre (argocd/root-app.yaml,
+# rendu par argocd-bootstrap.yml). Parametre plutot que valeur figee dans le
+# manifest : ce depot ne doit pas dependre du contenu de platform-gitops,
+# seulement de sa configuration. Surchargeable (-e gitops_repo_url=...).
+gitops_repo_url: "https://github.com/k8s-gitops-lab/platform-gitops"
