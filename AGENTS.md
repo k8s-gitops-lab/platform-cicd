@@ -40,7 +40,7 @@ make status                 # État des Applications ArgoCD
 
 | Fichier | Rôle |
 |---------|------|
-| `argocd/root-app.yaml` | Application racine ArgoCD (appliquée une seule fois à la main) |
+| `argocd/root-app.yaml` | Application racine ArgoCD (template : `repoURL` rendu depuis `gitops_repo_url` ; appliquée une seule fois à la main) |
 | `argocd/repo-server-ca-patch.yaml` | Patch CA corporate pour argocd-repo-server |
 | `argocd/dex-ca-patch.yaml` | Patch CA pour argocd-dex-server |
 | `scripts/platform_inventory.py` | Modèle de données historique partagé avec `toolbox` |

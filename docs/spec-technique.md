@@ -4,7 +4,7 @@
 
 ```
 argocd/
-  root-app.yaml              Application racine ArgoCD (appliquée une fois à la main)
+  root-app.yaml              Application racine ArgoCD (template Jinja2, rendue puis appliquée une fois à la main)
   repo-server-ca-patch.yaml  Patch strategic merge pour le CA corporate
   dex-ca-patch.yaml          Patch strategic merge pour le CA Gateway
 scripts/
@@ -79,8 +79,9 @@ Chaque cible Makefile individuelle (`argocd-install`, `argocd-bootstrap`,
   locale). Le rôle attend le rollout, extrait le bundle CA du pod, fusionne
   avec le certificat additionnel, recrée le ConfigMap, patche le déploiement
   puis attend de nouveau le rollout.
-- `argocd-bootstrap` : attente du CRD `Application` puis application de
-  `argocd/root-app.yaml`.
+- `argocd-bootstrap` : attente du CRD `Application`, rendu de
+  `argocd/root-app.yaml` (`ansible.builtin.template`, `repoURL` paramétré par
+  `gitops_repo_url`) puis application.
 - `flux-sops-age` : vérifie la clé age locale, crée le namespace `flux-system`
   et le Secret `sops-age`.
 - `argocd-ingress` : bascule `server.insecure=true` et redémarrage conditionnel.

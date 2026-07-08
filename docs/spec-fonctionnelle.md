@@ -12,7 +12,8 @@ dans l'ordre :
    `argocd-repo-server` pour que les clones HTTPS soient acceptés.
 3. **`argocd-trust-local-gateway-ca`** — Injecte le certificat de la Gateway
    locale dans `argocd-dex-server` pour que le callback OAuth GitLab fonctionne.
-4. **`argocd-bootstrap`** — Applique `argocd/root-app.yaml`. ArgoCD se
+4. **`argocd-bootstrap`** — Rend `argocd/root-app.yaml` (template : `repoURL`
+   vient de la variable `gitops_repo_url`) puis l'applique. ArgoCD se
    synchronise ensuite lui-même depuis `platform-gitops`.
 5. **`flux-sops-age`** — Injecte la clé privée age nécessaire au déchiffrement
    SOPS par Flux.
