@@ -49,12 +49,18 @@ def app_project(app: dict) -> dict:
 
 def app_data(app: dict) -> dict:
     """Donnees lues directement par app-envs-appset.yaml (git files generator) :
-    pas un manifest k8s, jamais liste dans kustomization.yaml."""
+    pas un manifest k8s, jamais liste dans kustomization.yaml.
+
+    Le champ est nomme manifestsPath (et non path) car le git files
+    generator d'ArgoCD reserve deja la cle "path" (objet path/basename/
+    filename/... decrivant l'emplacement du fichier matche) : en
+    goTemplate, ".path" s'y resout donc a la place de la valeur ici
+    fournie, cassant le rendu du champ source.path de l'Application."""
     return {
         "app": app["name"],
         "project": app["argocd"]["project"],
         "repoURL": app["manifests"]["argocdRepoURL"],
-        "path": app["manifests"]["path"],
+        "manifestsPath": app["manifests"]["path"],
         "environments": [
             {"name": env["name"], "branch": env["branch"], "namespace": env["namespace"]}
             for env in app["environments"]
@@ -197,7 +203,7 @@ def app_envs_appset(pconst: dict) -> dict:
                     "source": {
                         "repoURL": "{{ .repoURL }}",
                         "targetRevision": "{{ .branch }}",
-                        "path": "{{ .path }}",
+                        "path": "{{ .manifestsPath }}",
                     },
                     "destination": {
                         "server": "https://kubernetes.default.svc",
