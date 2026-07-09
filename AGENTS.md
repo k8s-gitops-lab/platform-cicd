@@ -91,3 +91,10 @@ un seul `ansible-playbook`.
 - Ne pas exécuter `make bootstrap` sur un cluster déjà bootstrappé sans
   vérifier l'idempotence de chaque étape.
 - Ne pas committer de tokens ou mots de passe dans ce dépôt.
+
+## Gouvernance du développement
+
+Ce repo fait partie de la plateforme poc-devops : toute contribution suit
+les trois axes de maîtrise (produit, code, architecture) définis dans
+`cockpit/AGENTS.md`, section « Gouvernance du développement » — PRD et
+backlog dans `cockpit/docs/`.
