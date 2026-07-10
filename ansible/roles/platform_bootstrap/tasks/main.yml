@@ -37,3 +37,7 @@
 - name: Créer le Secret K8s du token runner GitLab
   tags: [gitlab-runner-token]
   ansible.builtin.import_tasks: gitlab-runner-token.yml
+
+- name: Créer le Secret K8s du token runner gitlab.com
+  tags: [gitlab-runner-token-com]
+  ansible.builtin.import_tasks: gitlab-runner-token-com.yml

@@ -1,0 +1,3 @@
+---
+- name: Créer le Secret K8s du token runner gitlab.com
+  ansible.builtin.command: "python3 {{ platform_cicd_root }}/scripts/gitlab-runner-token-com.py"

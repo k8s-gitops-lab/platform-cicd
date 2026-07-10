@@ -35,7 +35,7 @@ ANSIBLE_VARS = \
   -e gitlab_ready_timeout=$(GITLAB_READY_TIMEOUT) \
   -e platform_cicd_root=$(CURDIR)
 
-.PHONY: help bootstrap bootstrap-from-% argocd-install argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-password gitlab-url gitlab-status gitlab-tf-credentials gitlab-runner-token argocd-apps-render check-generated init-project status flux-sops-age
+.PHONY: help bootstrap bootstrap-from-% argocd-install argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-password gitlab-url gitlab-status gitlab-tf-credentials gitlab-runner-token gitlab-runner-token-com argocd-apps-render check-generated init-project status flux-sops-age
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -92,6 +92,10 @@ gitlab-tf-credentials: ## Cree le PAT GitLab et le Secret K8s consomme par Terra
 gitlab-runner-token: ## Cree le Secret K8s du token runner
 	@echo "==> platform-bootstrap: gitlab-runner-token (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-runner-token $(ANSIBLE_VARS)
+
+gitlab-runner-token-com: ## Cree le Secret K8s du token runner gitlab.com (group_type, via le PAT)
+	@echo "==> platform-bootstrap: gitlab-runner-token-com (ansible)"
+	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-runner-token-com $(ANSIBLE_VARS)
 
 argocd-apps-render: ## Genere les manifests ArgoCD depuis argocd/apps/<app>/app.yaml
 	APPS_FILE="$(GITOPS_APPS_FILE)" python3 ./scripts/render-argocd-apps.py

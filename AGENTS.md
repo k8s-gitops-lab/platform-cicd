@@ -31,7 +31,8 @@ make argocd-install         # Installer ArgoCD seul
 make argocd-password        # Afficher le mot de passe admin initial
 make gitlab-password        # Afficher le mot de passe root initial
 make gitlab-tf-credentials  # Créer le PAT/Secret GitLab consommé par Terraform
-make gitlab-runner-token    # Créer le token runner GitLab
+make gitlab-runner-token    # Créer le token runner GitLab (instance locale)
+make gitlab-runner-token-com # Créer le token runner gitlab.com (group_type, via le PAT)
 make argocd-apps-render     # Générer argocd/generated/apps/* depuis app.yaml
 make check-generated        # Vérifier que les manifests apps générés sont à jour
 make status                 # État des Applications ArgoCD
@@ -47,7 +48,8 @@ make status                 # État des Applications ArgoCD
 | `scripts/render-argocd-apps.py` | Génère `platform-gitops/argocd/generated/apps/*` depuis `argocd/apps/<app>.yaml` (propage aussi `description` dans `AppProject.spec.description`). Rejoué automatiquement par le pipeline `.gitlab-ci.yml` du projet GitLab `platform-gitops` — `make argocd-apps-render` reste utile en local |
 | `scripts/filter-argocd-install.py` | Filtre le manifest ArgoCD (retire les notifications) |
 | `scripts/gitlab-tf-credentials.py` | Crée le PAT GitLab et le Secret K8s consommés par Terraform |
-| `scripts/gitlab-runner-token.py` | Crée le Secret K8s du token runner |
+| `scripts/gitlab-runner-token.py` | Crée le Secret K8s du token runner (instance locale, root) |
+| `scripts/gitlab-runner-token-com.py` | Crée le Secret K8s du token runner gitlab.com (PAT, group_type) |
 | `scripts/bootstrap-tags.py` | Calcule le sous-ensemble d'étapes (`--tags`) à passer à `ansible-playbook` selon `START_AT`/`STOP_AFTER` — ne séquence rien lui-même |
 
 Le code Ansible (playbook `ansible/playbook-platform.yml`, rôles
