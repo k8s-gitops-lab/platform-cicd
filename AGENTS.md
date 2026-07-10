@@ -4,11 +4,12 @@
 
 `platform-bootstrap` installe ArgoCD sur le cluster Kubernetes, puis applique le
 root Application "app of apps" qui délègue à ArgoCD le déploiement
-déclaratif de GitLab et des autres add-ons depuis `platform-gitops`. Ce
-dépôt attend ensuite que GitLab soit prêt pour configurer ses credentials
-(PAT Terraform, token runner) — il ne déploie pas GitLab lui-même. Pas de
-SSO : ArgoCD s'utilise en login local `admin` (décommissionné le
-2026-07-10, cf. `cockpit/docs/backlog.md`).
+déclaratif des add-ons depuis `platform-gitops` — dont le runner gitlab.com
+(`gitlab-runner-com`). Il configure ensuite le token de ce runner
+(`gitlab-runner-token-com`). GitLab lui-même est **gitlab.com**, hors de
+ce cluster (l'instance locale a été décommissionnée le 2026-07-10, bascule
+big bang, cf. `cockpit/docs/backlog.md`). Pas de SSO : ArgoCD s'utilise en
+login local `admin`.
 Une fois le bootstrap effectué, ArgoCD gère la plateforme en continu depuis
 `platform-gitops`.
 
@@ -25,13 +26,10 @@ Une fois le bootstrap effectué, ArgoCD gère la plateforme en continu depuis
 ## Commandes principales
 
 ```bash
-make bootstrap              # Bootstrap complet (ArgoCD, puis attente GitLab + credentials)
-make bootstrap START_AT=gitlab-tf-credentials # Reprendre le bootstrap à une étape
+make bootstrap              # Bootstrap complet (ArgoCD, puis token runner gitlab.com)
+make bootstrap START_AT=gitlab-runner-token-com # Reprendre le bootstrap à une étape
 make argocd-install         # Installer ArgoCD seul
 make argocd-password        # Afficher le mot de passe admin initial
-make gitlab-password        # Afficher le mot de passe root initial
-make gitlab-tf-credentials  # Créer le PAT/Secret GitLab consommé par Terraform
-make gitlab-runner-token    # Créer le token runner GitLab (instance locale)
 make gitlab-runner-token-com # Créer le token runner gitlab.com (group_type, via le PAT)
 make argocd-apps-render     # Générer argocd/generated/apps/* depuis app.yaml
 make check-generated        # Vérifier que les manifests apps générés sont à jour
@@ -47,8 +45,6 @@ make status                 # État des Applications ArgoCD
 | `scripts/platform_inventory.py` | Modèle de données historique partagé avec `toolbox` |
 | `scripts/render-argocd-apps.py` | Génère `platform-gitops/argocd/generated/apps/*` depuis `argocd/apps/<app>.yaml` (propage aussi `description` dans `AppProject.spec.description`). Rejoué automatiquement par le pipeline `.gitlab-ci.yml` du projet GitLab `platform-gitops` — `make argocd-apps-render` reste utile en local |
 | `scripts/filter-argocd-install.py` | Filtre le manifest ArgoCD (retire les notifications) |
-| `scripts/gitlab-tf-credentials.py` | Crée le PAT GitLab et le Secret K8s consommés par Terraform |
-| `scripts/gitlab-runner-token.py` | Crée le Secret K8s du token runner (instance locale, root) |
 | `scripts/gitlab-runner-token-com.py` | Crée le Secret K8s du token runner gitlab.com (PAT, group_type) |
 | `scripts/bootstrap-tags.py` | Calcule le sous-ensemble d'étapes (`--tags`) à passer à `ansible-playbook` selon `START_AT`/`STOP_AFTER` — ne séquence rien lui-même |
 

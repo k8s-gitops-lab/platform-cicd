@@ -17,12 +17,11 @@ dans l'ordre :
    SOPS par Flux.
 5. **`argocd-ingress`** — Configure ArgoCD en mode HTTP (insecure) pour être
    exposé derrière la Gateway Traefik.
-6. **`gitlab-tf-credentials`** — Attend la readiness API GitLab strictement
-   nécessaire, crée/rotate le PAT GitLab
-   `terraform-controller` et le stocke dans le Secret `gitlab-tf-credentials`
-   du namespace `flux-system`, consommé par `Terraform/gitlab-iac`.
-7. **`gitlab-runner-token`** — Crée le token runner d'instance et le stocke
-   dans `gitlab-gitlab-runner-secret`. Idempotent.
+6. **`gitlab-runner-token-com`** — Crée un runner `group_type` sur le groupe
+   gitlab.com `k8s-gitops-lab` via le PAT (`flux-system/gitlabcom-credentials`)
+   et stocke le token dans `gitlabcom-gitlab-runner-secret` du namespace
+   `gitlab-runner`, consommé par l'Application `gitlab-runner-com`.
+   Idempotent.
 
 En cas d'échec, on ne relance pas forcément tout le bootstrap :
 `make bootstrap START_AT=<étape>` reprend à l'étape indiquée et rejoue la suite.

@@ -30,14 +30,6 @@
   tags: [argocd-ingress]
   ansible.builtin.import_tasks: argocd-ingress.yml
 
-- name: Créer le PAT GitLab et le Secret K8s pour Terraform
-  tags: [gitlab-tf-credentials]
-  ansible.builtin.import_tasks: gitlab-tf-credentials.yml
-
-- name: Créer le Secret K8s du token runner GitLab
-  tags: [gitlab-runner-token]
-  ansible.builtin.import_tasks: gitlab-runner-token.yml
-
 - name: Créer le Secret K8s du token runner gitlab.com
   tags: [gitlab-runner-token-com]
   ansible.builtin.import_tasks: gitlab-runner-token-com.yml

@@ -5,10 +5,10 @@ argocd_wait_timeout: 600s
 corporate_ca_label: Zscaler
 flux_namespace: flux-system
 sops_age_key_file: "{{ lookup('env', 'HOME') }}/.config/sops/age/keys.txt"
+# Domaine nip.io du cluster local (GitLab local decommissionne, cf.
+# cockpit/docs/backlog.md -- garde ce nom pour le moment, argocd_url en
+# depend toujours).
 gitlab_domain: 192.168.33.100.nip.io
-gitlab_namespace: gitlab
-gitlab_ready_timeout: 600
-gitlab_url: "https://gitlab.{{ gitlab_domain }}"
 argocd_url: "https://argocd.{{ gitlab_domain }}"
 
 # Ce rôle vit dans platform-bootstrap/ansible/ : platform_cicd_root pointe donc

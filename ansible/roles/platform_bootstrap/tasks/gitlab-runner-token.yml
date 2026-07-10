@@ -1,7 +1,0 @@
----
-- name: Créer le Secret K8s du token runner GitLab
-  ansible.builtin.command: "python3 {{ platform_cicd_root }}/scripts/gitlab-runner-token.py"
-  environment:
-    GITLAB_NAMESPACE: "{{ gitlab_namespace }}"
-    GITLAB_URL: "{{ gitlab_url }}"
-    GITLAB_READY_TIMEOUT: "{{ gitlab_ready_timeout }}"

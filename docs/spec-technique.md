@@ -11,9 +11,7 @@ scripts/
   render-argocd-apps.py      Génère les manifests ArgoCD depuis argocd/apps/<app>.yaml
   bootstrap-tags.py          Calcule le sous-ensemble d'étapes (--tags) a passer a ansible-playbook selon START_AT/STOP_AFTER
   filter-argocd-install.py   Filtre le manifest ArgoCD (retire notifications)
-  gitlab_bootstrap.py        Helpers readiness GitLab ciblée
-  gitlab-tf-credentials.py   Crée le PAT/Secret GitLab consommé par Terraform
-  gitlab-runner-token.py     Crée le token runner et le Secret K8s
+  gitlab-runner-token-com.py Crée le token runner gitlab.com (group_type, via le PAT) et le Secret K8s
 ansible/
   playbook-platform.yml      Étapes ArgoCD/Flux/GitLab du bootstrap, sélectionnées via --tags
   ansible.cfg, inventory.ini Config minimale (hosts: local)
@@ -47,7 +45,7 @@ chemin local.
 
 ## Séquence de bootstrap (Ansible, dans `ansible/`)
 
-Toute la séquence de bootstrap (ArgoCD, Flux, GitLab) est portée par un seul
+Toute la séquence de bootstrap (ArgoCD, Flux, runner gitlab.com) est portée par un seul
 playbook `ansible/playbook-platform.yml` de ce dépôt, dans l'ordre déclaré
 par `BOOTSTRAP_STEPS` du Makefile — cf. la règle d'ordre de préférence dans
 `AGENTS.md` (TF/K8s déclaratif, puis Ansible pour l'orchestration
@@ -64,9 +62,8 @@ puis lance **un seul** `ansible-playbook playbook-platform.yml --tags <étapes>`
 
 Chaque cible Makefile individuelle (`argocd-install`, `argocd-bootstrap`,
 `argocd-trust-corporate-ca`, `flux-sops-age`,
-`argocd-ingress`, `gitlab-tf-credentials`,
-`gitlab-runner-token`) reste utilisable seule et n'est qu'un appel à
-`ansible-playbook playbook-platform.yml --tags <étape>` :
+`argocd-ingress`, `gitlab-runner-token-com`) reste utilisable seule et
+n'est qu'un appel à `ansible-playbook playbook-platform.yml --tags <étape>` :
 
 - `argocd-install` : namespace ArgoCD + manifest filtré (`server-side apply`).
 - `argocd-trust-corporate-ca` : instance du rôle `argocd_trust_ca`, paramétrée
@@ -81,31 +78,22 @@ Chaque cible Makefile individuelle (`argocd-install`, `argocd-bootstrap`,
 - `flux-sops-age` : vérifie la clé age locale, crée le namespace `flux-system`
   et le Secret `sops-age`.
 - `argocd-ingress` : bascule `server.insecure=true` et redémarrage conditionnel.
-- `gitlab-tf-credentials` / `gitlab-runner-token` : tâches qui invoquent les
-  scripts Python correspondants (variables d'env via `environment:` sur la
-  tâche) — ces scripts gèrent déjà leur propre polling/idempotence contre
-  l'API GitLab, seule leur invocation a été déplacée dans le playbook.
+- `gitlab-runner-token-com` : invoque le script Python correspondant (variables
+  d'env via `environment:` sur la tâche) — le script gère déjà son propre
+  idempotence contre l'API gitlab.com, seule son invocation est dans le
+  playbook.
 
-## `gitlab-tf-credentials.py` — token Terraform GitLab
+## `gitlab-runner-token-com.py` — token runner gitlab.com
 
-1. Vérifie si `flux-system/gitlab-tf-credentials` existe avec un token encore
-   valide contre l'API GitLab.
-2. Attend la readiness API GitLab via `/-/readiness`.
-3. Si absent ou invalide, récupère le mot de passe root GitLab depuis le Secret
-   K8s `gitlab-gitlab-initial-root-password`.
-4. S'authentifie via l'API GitLab (password grant OAuth2).
-5. Crée/rotate un PAT `terraform-controller` avec les scopes `api`,
-   `read_repository`, `write_repository`.
-6. Applique le Secret K8s `gitlab-tf-credentials` dans `flux-system`, consommé
-   par `Terraform/gitlab-iac`.
-
-## `gitlab-runner-token.py` — token runner
-
-1. Vérifie l'idempotence : le Secret `gitlab-gitlab-runner-secret` existe-t-il avec un token ?
-2. Attend la readiness API GitLab via `/-/readiness`.
-3. S'authentifie via l'API GitLab.
-4. Crée un runner d'instance via `/api/v4/user/runners`.
-5. Applique un Secret K8s via `kubectl apply` (dry-run + pipe).
+1. Vérifie l'idempotence : le Secret `gitlab-runner/gitlabcom-gitlab-runner-secret`
+   existe-t-il avec un token ?
+2. Lit le PAT depuis le Secret K8s `flux-system/gitlabcom-credentials`
+   (`gitlab_token`).
+3. Crée un runner `group_type` (scope au groupe `k8s-gitops-lab`,
+   id `137124101`) via `POST /api/v4/user/runners` — `instance_type` échoue
+   sur gitlab.com (pas admin d'instance SaaS).
+4. Applique le Secret K8s `gitlabcom-gitlab-runner-secret` dans le namespace
+   `gitlab-runner` via `kubectl apply` (dry-run + pipe).
 
 ## Dépendances
 

@@ -4,8 +4,8 @@ SHELL := /bin/bash -e -o pipefail
 ARGOCD_NAMESPACE  ?= argocd
 ARGOCD_VERSION    ?= v3.4.4
 ARGOCD_WAIT_TIMEOUT ?= 600s
-GITLAB_READY_TIMEOUT ?= 600
-GITLAB_NAMESPACE  ?= gitlab
+# Domaine nip.io du cluster local (GitLab local decommissionne, cf.
+# cockpit/docs/backlog.md -- garde ce nom, argocd-url en depend toujours).
 GITLAB_DOMAIN     ?= 192.168.33.100.nip.io
 CORPORATE_CA_LABEL ?= Zscaler
 GITOPS_REPO_ROOT   ?= ../platform-gitops
@@ -31,11 +31,9 @@ ANSIBLE_VARS = \
   -e flux_namespace=$(FLUX_NAMESPACE) \
   -e sops_age_key_file=$(SOPS_AGE_KEY_FILE) \
   -e gitlab_domain=$(GITLAB_DOMAIN) \
-  -e gitlab_namespace=$(GITLAB_NAMESPACE) \
-  -e gitlab_ready_timeout=$(GITLAB_READY_TIMEOUT) \
   -e platform_cicd_root=$(CURDIR)
 
-.PHONY: help bootstrap bootstrap-from-% argocd-install argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-password gitlab-url gitlab-status gitlab-tf-credentials gitlab-runner-token gitlab-runner-token-com argocd-apps-render check-generated init-project status flux-sops-age
+.PHONY: help bootstrap bootstrap-from-% argocd-install argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-runner-token-com argocd-apps-render check-generated init-project status flux-sops-age
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -46,7 +44,7 @@ bootstrap: ## Deploie la plateforme sur le contexte Kubernetes courant (un seul 
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags "$$tags" $(ANSIBLE_VARS)
 	@echo ""
 	@echo "Plateforme prete."
-	@echo "GitLab : https://gitlab.$(GITLAB_DOMAIN)  (root / make gitlab-password)"
+	@echo "GitLab : https://gitlab.com/k8s-gitops-lab"
 	@echo "ArgoCD : https://argocd.$(GITLAB_DOMAIN)  (admin / make argocd-password)"
 	@echo "Registry: ghcr.io (GitHub Container Registry)"
 
@@ -74,24 +72,6 @@ argocd-password: ## Affiche le mot de passe admin initial d'ArgoCD
 
 argocd-url: ## Affiche l'URL ArgoCD
 	@echo "http://argocd.$(GITLAB_DOMAIN)"
-
-gitlab-password: ## Affiche le mot de passe root initial de GitLab
-	@kubectl -n $(GITLAB_NAMESPACE) get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' | base64 -d; echo
-
-gitlab-url: ## Affiche l'URL GitLab
-	@echo "https://gitlab.$(GITLAB_DOMAIN)"
-
-gitlab-status: ## Affiche l'etat GitLab
-	@kubectl -n $(ARGOCD_NAMESPACE) get application gitlab gitlab-routes
-	@kubectl -n $(GITLAB_NAMESPACE) get pods
-
-gitlab-tf-credentials: ## Cree le PAT GitLab et le Secret K8s consomme par Terraform
-	@echo "==> platform-bootstrap: gitlab-tf-credentials (ansible)"
-	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-tf-credentials $(ANSIBLE_VARS)
-
-gitlab-runner-token: ## Cree le Secret K8s du token runner
-	@echo "==> platform-bootstrap: gitlab-runner-token (ansible)"
-	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-runner-token $(ANSIBLE_VARS)
 
 gitlab-runner-token-com: ## Cree le Secret K8s du token runner gitlab.com (group_type, via le PAT)
 	@echo "==> platform-bootstrap: gitlab-runner-token-com (ansible)"
