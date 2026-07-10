@@ -35,7 +35,7 @@ ANSIBLE_VARS = \
   -e gitlab_ready_timeout=$(GITLAB_READY_TIMEOUT) \
   -e platform_cicd_root=$(CURDIR)
 
-.PHONY: help bootstrap bootstrap-from-% argocd-install argocd-bootstrap argocd-trust-corporate-ca argocd-trust-local-gateway-ca argocd-ingress argocd-url argocd-password gitlab-password gitlab-url gitlab-status gitlab-tf-credentials gitlab-dex-oauth-app gitlab-runner-token argocd-apps-render check-generated init-project status flux-sops-age
+.PHONY: help bootstrap bootstrap-from-% argocd-install argocd-bootstrap argocd-trust-corporate-ca argocd-ingress argocd-url argocd-password gitlab-password gitlab-url gitlab-status gitlab-tf-credentials gitlab-runner-token argocd-apps-render check-generated init-project status flux-sops-age
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}'
@@ -65,10 +65,6 @@ argocd-trust-corporate-ca: ## Cree le ConfigMap CA corporate pour argocd-repo-se
 	@echo "==> platform-bootstrap: argocd-trust-corporate-ca (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags argocd-trust-corporate-ca $(ANSIBLE_VARS)
 
-argocd-trust-local-gateway-ca: ## Cree le ConfigMap CA local pour Dex/GitLab OAuth
-	@echo "==> platform-bootstrap: argocd-trust-local-gateway-ca (ansible)"
-	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags argocd-trust-local-gateway-ca $(ANSIBLE_VARS)
-
 argocd-ingress: ## Configure ArgoCD en HTTP (bootstrap uniquement ; server.insecure est ensuite maintenu par l'Application argocd-config)
 	@echo "==> platform-bootstrap: argocd-ingress (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags argocd-ingress $(ANSIBLE_VARS)
@@ -92,10 +88,6 @@ gitlab-status: ## Affiche l'etat GitLab
 gitlab-tf-credentials: ## Cree le PAT GitLab et le Secret K8s consomme par Terraform
 	@echo "==> platform-bootstrap: gitlab-tf-credentials (ansible)"
 	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-tf-credentials $(ANSIBLE_VARS)
-
-gitlab-dex-oauth-app: ## Cree l'application OAuth GitLab pour Dex et renseigne argocd-secret
-	@echo "==> platform-bootstrap: gitlab-dex-oauth-app (ansible)"
-	cd $(ANSIBLE_DIR) && ansible-playbook playbook-platform.yml --tags gitlab-dex-oauth-app $(ANSIBLE_VARS)
 
 gitlab-runner-token: ## Cree le Secret K8s du token runner
 	@echo "==> platform-bootstrap: gitlab-runner-token (ansible)"

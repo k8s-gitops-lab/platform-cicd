@@ -3,7 +3,7 @@
 Bootstrap technique de la plateforme applicative du POC : installe ArgoCD,
 puis attend que GitLab (déployé déclarativement par ArgoCD depuis
 `../platform-gitops`) soit prêt pour configurer ses credentials (PAT
-Terraform, SSO Dex, token runner). Les images applicatives sont poussées sur
+Terraform, token runner). Les images applicatives sont poussées sur
 GHCR, pas sur un registry interne au cluster.
 
 Ce repo se deploie sur le contexte Kubernetes courant. Il ne cree pas de

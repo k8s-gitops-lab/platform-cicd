@@ -1,9 +1,0 @@
----
-- name: Créer l'application OAuth GitLab pour Dex
-  ansible.builtin.command: "python3 {{ platform_cicd_root }}/scripts/gitlab-dex-oauth-app.py"
-  environment:
-    GITLAB_NAMESPACE: "{{ gitlab_namespace }}"
-    ARGOCD_NAMESPACE: "{{ argocd_namespace }}"
-    GITLAB_URL: "{{ gitlab_url }}"
-    ARGOCD_URL: "{{ argocd_url }}"
-    GITLAB_READY_TIMEOUT: "{{ gitlab_ready_timeout }}"

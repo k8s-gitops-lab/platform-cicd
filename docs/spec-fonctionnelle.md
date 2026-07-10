@@ -10,22 +10,18 @@ dans l'ordre :
    ressources `notifications` non utilisées.
 2. **`argocd-trust-corporate-ca`** — Injecte le certificat CA Zscaler dans
    `argocd-repo-server` pour que les clones HTTPS soient acceptés.
-3. **`argocd-trust-local-gateway-ca`** — Injecte le certificat de la Gateway
-   locale dans `argocd-dex-server` pour que le callback OAuth GitLab fonctionne.
-4. **`argocd-bootstrap`** — Rend `argocd/root-app.yaml` (template : `repoURL`
+3. **`argocd-bootstrap`** — Rend `argocd/root-app.yaml` (template : `repoURL`
    vient de la variable `gitops_repo_url`) puis l'applique. ArgoCD se
    synchronise ensuite lui-même depuis `platform-gitops`.
-5. **`flux-sops-age`** — Injecte la clé privée age nécessaire au déchiffrement
+4. **`flux-sops-age`** — Injecte la clé privée age nécessaire au déchiffrement
    SOPS par Flux.
-6. **`argocd-ingress`** — Configure ArgoCD en mode HTTP (insecure) pour être
+5. **`argocd-ingress`** — Configure ArgoCD en mode HTTP (insecure) pour être
    exposé derrière la Gateway Traefik.
-7. **`gitlab-tf-credentials`** — Attend la readiness API GitLab strictement
+6. **`gitlab-tf-credentials`** — Attend la readiness API GitLab strictement
    nécessaire, crée/rotate le PAT GitLab
    `terraform-controller` et le stocke dans le Secret `gitlab-tf-credentials`
    du namespace `flux-system`, consommé par `Terraform/gitlab-iac`.
-8. **`gitlab-dex-oauth-app`** — Crée l'application OAuth GitLab pour Dex et
-   renseigne `argocd-secret`. Idempotent : ne refait rien si le secret existe.
-9. **`gitlab-runner-token`** — Crée le token runner d'instance et le stocke
+7. **`gitlab-runner-token`** — Crée le token runner d'instance et le stocke
    dans `gitlab-gitlab-runner-secret`. Idempotent.
 
 En cas d'échec, on ne relance pas forcément tout le bootstrap :
@@ -46,17 +42,12 @@ sous `platform-gitops/argocd/generated/apps/<app>/` à partir de
 `argocd/generated/apps/*`. `make check-generated` vérifie que les fichiers
 committés sont à jour.
 
-## SSO GitLab → ArgoCD (Dex)
+## Authentification ArgoCD
 
-L'authentification ArgoCD passe par Dex, qui délègue à GitLab OAuth2 :
-
-1. L'utilisateur clique "Login with GitLab" sur l'UI ArgoCD.
-2. Dex redirige vers `https://gitlab.<domaine>/oauth/authorize`.
-3. GitLab redirige vers `https://argocd.<domaine>/api/dex/callback`.
-4. Dex valide et émet un token ArgoCD.
-
-Les credentials OAuth (client ID / secret) sont stockés dans `argocd-secret`
-et renseignés par `gitlab-dex-oauth-app.py`.
+Pas de SSO : login local `admin` uniquement (mot de passe initial via
+`make argocd-password`). Le connecteur Dex↔GitLab a été décommissionné le
+2026-07-10 (cf. `cockpit/docs/backlog.md`, migration GitLab → gitlab.com) —
+pas de besoin avéré pour ce lab mono-opérateur.
 
 ## Registre d'images (GHCR)
 

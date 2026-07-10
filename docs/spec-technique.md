@@ -6,7 +6,6 @@
 argocd/
   root-app.yaml              Application racine ArgoCD (template Jinja2, rendue puis appliquée une fois à la main)
   repo-server-ca-patch.yaml  Patch strategic merge pour le CA corporate
-  dex-ca-patch.yaml          Patch strategic merge pour le CA Gateway
 scripts/
   platform_inventory.py      Modèle historique d'inventaire apps
   render-argocd-apps.py      Génère les manifests ArgoCD depuis argocd/apps/<app>.yaml
@@ -14,14 +13,13 @@ scripts/
   filter-argocd-install.py   Filtre le manifest ArgoCD (retire notifications)
   gitlab_bootstrap.py        Helpers readiness GitLab ciblée
   gitlab-tf-credentials.py   Crée le PAT/Secret GitLab consommé par Terraform
-  gitlab-dex-oauth-app.py    Crée l'app OAuth GitLab pour Dex
   gitlab-runner-token.py     Crée le token runner et le Secret K8s
 ansible/
   playbook-platform.yml      Étapes ArgoCD/Flux/GitLab du bootstrap, sélectionnées via --tags
   ansible.cfg, inventory.ini Config minimale (hosts: local)
   roles/
     platform_bootstrap/      Séquence de bootstrap (une tâche/tag par étape)
-    argocd_trust_ca/         Rôle paramétré, réutilisé par argocd-trust-corporate-ca et argocd-trust-local-gateway-ca
+    argocd_trust_ca/         Rôle paramétré, utilisé par argocd-trust-corporate-ca
 Makefile
 requirements.txt             pyyaml
 ```
@@ -65,40 +63,28 @@ puis lance **un seul** `ansible-playbook playbook-platform.yml --tags <étapes>`
 - `make bootstrap-from-<étape>` reste le raccourci `START_AT=<étape>`.
 
 Chaque cible Makefile individuelle (`argocd-install`, `argocd-bootstrap`,
-`argocd-trust-corporate-ca`, `argocd-trust-local-gateway-ca`, `flux-sops-age`,
-`argocd-ingress`, `gitlab-tf-credentials`, `gitlab-dex-oauth-app`,
+`argocd-trust-corporate-ca`, `flux-sops-age`,
+`argocd-ingress`, `gitlab-tf-credentials`,
 `gitlab-runner-token`) reste utilisable seule et n'est qu'un appel à
 `ansible-playbook playbook-platform.yml --tags <étape>` :
 
 - `argocd-install` : namespace ArgoCD + manifest filtré (`server-side apply`).
-- `argocd-trust-corporate-ca` / `argocd-trust-local-gateway-ca` : instances du
-  rôle `argocd_trust_ca`, paramétrées par le déploiement ciblé
-  (`argocd-repo-server` / `argocd-dex-server`), le fichier de patch et la
-  commande shell qui produit le certificat additionnel (trousseau macOS pour
-  le CA corporate, Secret `nip-io-wildcard-tls` pour le CA de la Gateway
-  locale). Le rôle attend le rollout, extrait le bundle CA du pod, fusionne
-  avec le certificat additionnel, recrée le ConfigMap, patche le déploiement
-  puis attend de nouveau le rollout.
+- `argocd-trust-corporate-ca` : instance du rôle `argocd_trust_ca`, paramétrée
+  pour `argocd-repo-server`, le fichier de patch et la commande shell qui
+  produit le certificat additionnel (trousseau macOS pour le CA corporate).
+  Le rôle attend le rollout, extrait le bundle CA du pod, fusionne avec le
+  certificat additionnel, recrée le ConfigMap, patche le déploiement puis
+  attend de nouveau le rollout.
 - `argocd-bootstrap` : attente du CRD `Application`, rendu de
   `argocd/root-app.yaml` (`ansible.builtin.template`, `repoURL` paramétré par
   `gitops_repo_url`) puis application.
 - `flux-sops-age` : vérifie la clé age locale, crée le namespace `flux-system`
   et le Secret `sops-age`.
 - `argocd-ingress` : bascule `server.insecure=true` et redémarrage conditionnel.
-- `gitlab-tf-credentials` / `gitlab-dex-oauth-app` / `gitlab-runner-token` :
-  tâches qui invoquent les scripts Python correspondants (variables d'env via
-  `environment:` sur la tâche) — ces scripts gèrent déjà leur propre
-  polling/idempotence contre l'API GitLab, seule leur invocation a été
-  déplacée dans le playbook.
-
-## `gitlab-dex-oauth-app.py` — OAuth GitLab → Dex
-
-1. Vérifie l'idempotence : `argocd-secret` contient-il déjà `dex.gitlab.clientID` ?
-2. Attend la readiness API GitLab via `/-/readiness`.
-3. Récupère le mot de passe root GitLab depuis le Secret K8s.
-4. S'authentifie via l'API GitLab (password grant OAuth2).
-5. Crée l'application OAuth avec `trusted: true` et `confidential: true`.
-6. Patch `argocd-secret` avec `dex.gitlab.clientID` et `dex.gitlab.clientSecret`.
+- `gitlab-tf-credentials` / `gitlab-runner-token` : tâches qui invoquent les
+  scripts Python correspondants (variables d'env via `environment:` sur la
+  tâche) — ces scripts gèrent déjà leur propre polling/idempotence contre
+  l'API GitLab, seule leur invocation a été déplacée dans le playbook.
 
 ## `gitlab-tf-credentials.py` — token Terraform GitLab
 
