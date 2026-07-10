@@ -77,8 +77,10 @@ def _normalize_app(app: dict, inventory: dict, pconst: dict) -> dict:
     # repoURL (user-facing, external GitLab or source repo) derived if absent
     if "repoURL" not in manifests:
         manifests["repoURL"] = f"https://gitlab.{domain}/{manifests['projectPath']}.git"
-    # argocdRepoURL: always the in-cluster GitLab URL, never stored in inventory
-    manifests["argocdRepoURL"] = f"http://{gitlab_host}/{manifests['projectPath']}.git"
+    # argocdRepoURL: in-cluster GitLab URL derived by convention, surchargeable
+    # (ex. migration app par app vers gitlab.com — cf. cockpit/docs/backlog.md).
+    if "argocdRepoURL" not in manifests:
+        manifests["argocdRepoURL"] = f"http://{gitlab_host}/{manifests['projectPath']}.git"
     if "localPath" not in manifests:
         manifests["localPath"] = f"../{name}-iac"
     if "mainPushAccessLevel" not in manifests:

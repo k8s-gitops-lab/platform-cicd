@@ -68,6 +68,16 @@ def app_data(app: dict) -> dict:
     }
 
 
+def is_local_gitlab_repo(app: dict, gitlab_host: str) -> bool:
+    """Le repo-creds genere ci-dessous suppose le compte root du GitLab local
+    (ClusterSecretStore gitlab-secrets) : ne s'applique qu'aux apps dont
+    argocdRepoURL pointe encore vers l'instance in-cluster. Un app migre
+    vers gitlab.com (argocdRepoURL surcharge, cf. platform_inventory.py) gère
+    son credential ArgoCD manuellement via platform-gitops/flux-secrets/
+    (PAT chiffre SOPS, cf. cockpit/docs/backlog.md)."""
+    return app["manifests"]["argocdRepoURL"].startswith(f"http://{gitlab_host}/")
+
+
 def repo_creds(app: dict) -> dict:
     secret_name = app["manifests"]["argocdSecretName"]
     repo_url = app["manifests"]["argocdRepoURL"]
@@ -234,6 +244,7 @@ def write_yaml(path: Path, docs: dict | list[dict]) -> None:
 def render(apps_file: Path, output_dir: Path, apps_appset_file: Path, app_envs_appset_file: Path) -> None:
     inventory = load_inventory(apps_file)
     pconst = platform_constants(inventory)
+    gitlab_host = inventory.get("gitlab", {}).get("internalHost", "")
 
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -245,7 +256,10 @@ def render(apps_file: Path, output_dir: Path, apps_appset_file: Path, app_envs_a
         app_dir.mkdir()
         write_yaml(app_dir / "app-project.yaml", app_project(app))
         write_yaml(app_dir / "namespaces.yaml", app_namespaces(app))
-        write_yaml(app_dir / "repo-creds.yaml", repo_creds(app))
+        resources = ["app-project.yaml", "namespaces.yaml"]
+        if is_local_gitlab_repo(app, gitlab_host):
+            write_yaml(app_dir / "repo-creds.yaml", repo_creds(app))
+            resources.append("repo-creds.yaml")
         # app-data.yaml : pas un manifest, lu directement par app-envs-appset.yaml
         # (git files generator) ; volontairement absent de kustomization.yaml.
         write_yaml(app_dir / "app-data.yaml", app_data(app))
@@ -254,11 +268,7 @@ def render(apps_file: Path, output_dir: Path, apps_appset_file: Path, app_envs_a
             {
                 "apiVersion": "kustomize.config.k8s.io/v1beta1",
                 "kind": "Kustomization",
-                "resources": [
-                    "app-project.yaml",
-                    "namespaces.yaml",
-                    "repo-creds.yaml",
-                ],
+                "resources": resources,
             },
         )
 
