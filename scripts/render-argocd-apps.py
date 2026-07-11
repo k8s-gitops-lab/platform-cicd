@@ -134,7 +134,18 @@ def root_appset(pconst: dict) -> dict:
     return {
         "apiVersion": "argoproj.io/v1alpha1",
         "kind": "ApplicationSet",
-        "metadata": {"name": "apps", "namespace": "argocd"},
+        "metadata": {
+            "name": "apps",
+            "namespace": "argocd",
+            # Wave apres terraform-gitlab (wave 2, cf. terraform-gitlab.yaml) :
+            # les AppProject par app sont un souci applicatif, pas un
+            # prerequis du bootstrap plateforme (tf-controller/flux-secrets)
+            # qui doit rester syncable meme si l'onboarding d'une app echoue.
+            # app-envs-appset (wave 4) depend de cette ApplicationSet pour
+            # que l'AppProject de chaque app existe avant de creer ses
+            # Applications par environnement.
+            "annotations": {"argocd.argoproj.io/sync-wave": "3"},
+        },
         "spec": {
             "goTemplate": True,
             "goTemplateOptions": ["missingkey=error"],
@@ -182,7 +193,16 @@ def app_envs_appset(pconst: dict) -> dict:
     return {
         "apiVersion": "argoproj.io/v1alpha1",
         "kind": "ApplicationSet",
-        "metadata": {"name": "app-envs", "namespace": "argocd"},
+        "metadata": {
+            "name": "app-envs",
+            "namespace": "argocd",
+            # Wave apres apps-appset (wave 3) : garantit que l'AppProject de
+            # chaque app existe deja quand cette ApplicationSet cree les
+            # Applications par environnement qui la referencent (sinon
+            # "application references project X which does not exist" au
+            # premier bootstrap, cf. cockpit/docs/backlog.md).
+            "annotations": {"argocd.argoproj.io/sync-wave": "4"},
+        },
         "spec": {
             "goTemplate": True,
             "goTemplateOptions": ["missingkey=error"],

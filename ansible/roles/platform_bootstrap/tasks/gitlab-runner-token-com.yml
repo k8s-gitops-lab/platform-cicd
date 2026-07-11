@@ -1,3 +1,13 @@
 ---
+- name: Attendre que la Kustomization Flux flux-secrets soit prête
+  ansible.builtin.command: >-
+    kubectl -n {{ flux_namespace }} wait kustomization/flux-secrets
+    --for=condition=Ready --timeout={{ flux_secrets_wait_timeout }}
+  register: flux_secrets_wait
+  until: flux_secrets_wait.rc == 0
+  retries: "{{ flux_secrets_wait_retries }}"
+  delay: "{{ flux_secrets_wait_delay }}"
+  changed_when: false
+
 - name: Créer le Secret K8s du token runner gitlab.com
   ansible.builtin.command: "python3 {{ platform_cicd_root }}/scripts/gitlab-runner-token-com.py"

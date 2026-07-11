@@ -4,6 +4,13 @@ argocd_version: v3.4.4
 argocd_wait_timeout: 600s
 corporate_ca_label: Zscaler
 flux_namespace: flux-system
+flux_secrets_wait_timeout: 300s
+# La Kustomization flux-secrets est créée indirectement par ArgoCD (root ->
+# tf-controller -> terraform-gitlab, cf. argocd/managed/terraform-gitlab.yaml)
+# et peut ne pas encore exister quand ce rôle l'attend : `kubectl wait` rend
+# NotFound immédiatement (il n'attend pas la création), donc on ré-essaie.
+flux_secrets_wait_retries: 10
+flux_secrets_wait_delay: 30
 sops_age_key_file: "{{ lookup('env', 'HOME') }}/.config/sops/age/keys.txt"
 # Domaine nip.io du cluster local (GitLab local decommissionne, cf.
 # cockpit/docs/backlog.md -- garde ce nom pour le moment, argocd_url en
