@@ -89,9 +89,14 @@ n'est qu'un appel à `ansible-playbook playbook-platform.yml --tags <étape>` :
    existe-t-il avec un token ?
 2. Lit le PAT depuis le Secret K8s `flux-system/gitlabcom-credentials`
    (`gitlab_token`).
-3. Crée un runner `group_type` (scope au groupe `k8s-gitops-lab`,
-   id `137124101`) via `POST /api/v4/user/runners` — `instance_type` échoue
-   sur gitlab.com (pas admin d'instance SaaS).
+3. Résout l'id du groupe `k8s-gitops-lab` par chemin (`GET /api/v4/groups/
+   <path>`) — l'id numérique n'est pas stable : ce groupe top-level ne peut
+   pas être recréé via l'API (403 anti-abus), donc après un rebuild complet
+   du cluster il est recréé manuellement via l'UI et change d'id à chaque
+   fois (cf. `cockpit/scripts/gitlab-tf-state-seed.py`, même approche). Crée
+   ensuite un runner `group_type` scopé à cet id via
+   `POST /api/v4/user/runners` — `instance_type` échoue sur gitlab.com (pas
+   admin d'instance SaaS).
 4. Applique le Secret K8s `gitlabcom-gitlab-runner-secret` dans le namespace
    `gitlab-runner` via `kubectl apply` (dry-run + pipe).
 

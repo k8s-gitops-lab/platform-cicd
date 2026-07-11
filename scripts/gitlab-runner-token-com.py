@@ -14,13 +14,18 @@ import json
 import os
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
 import urllib.request
 
 GITLAB_URL = os.environ.get("GITLAB_URL", "https://gitlab.com").rstrip("/")
-# Id du groupe racine k8s-gitops-lab sur gitlab.com (gitlab_group.root dans
-# gitlab-projects-iac/terraform-gitlabcom/main.tf), confirme via l'API le
-# 2026-07-10.
-GROUP_ID = os.environ.get("GITLAB_COM_GROUP_ID", "137124101")
+# Chemin du groupe racine k8s-gitops-lab sur gitlab.com -- l'id numerique
+# n'est PAS stable : ce groupe top-level ne peut pas etre recree via l'API
+# (403 anti-abus, cf. scripts/gitlab-tf-state-seed.py dans cockpit) et doit
+# etre recree manuellement via l'UI apres un rebuild complet du cluster,
+# ce qui lui donne un nouvel id a chaque fois. Resolu dynamiquement par
+# chemin plutot que fige en dur (meme approche que gitlab-tf-state-seed.py).
+GROUP_PATH = os.environ.get("GITLAB_COM_GROUP", "k8s-gitops-lab")
 PAT_NAMESPACE = os.environ.get("PAT_NAMESPACE", "flux-system")
 PAT_SECRET = os.environ.get("PAT_SECRET", "gitlabcom-credentials")
 RUNNER_NAMESPACE = os.environ.get("RUNNER_NAMESPACE", "gitlab-runner")
@@ -38,6 +43,12 @@ def kube_secret_field(namespace: str, name: str, jsonpath: str) -> str:
 
 def secret_exists(namespace: str, name: str) -> bool:
     return subprocess.run(["kubectl", "-n", namespace, "get", "secret", name], capture_output=True).returncode == 0
+
+
+def gitlab_get(path: str, token: str):
+    req = urllib.request.Request(f"{GITLAB_URL}{path}", headers={"PRIVATE-TOKEN": token})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())
 
 
 def gitlab_post(path: str, data: dict, token: str):
@@ -68,9 +79,16 @@ def main() -> None:
         print(f"PAT introuvable dans {PAT_NAMESPACE}/{PAT_SECRET}", file=sys.stderr)
         sys.exit(1)
 
+    try:
+        group = gitlab_get(f"/api/v4/groups/{urllib.parse.quote(GROUP_PATH, safe='')}", pat)
+    except urllib.error.HTTPError as e:
+        print(f"Groupe '{GROUP_PATH}' introuvable sur {GITLAB_URL} ({e.code}): {e.read().decode()}", file=sys.stderr)
+        sys.exit(1)
+    group_id = group["id"]
+
     runner = gitlab_post("/api/v4/user/runners", {
         "runner_type": "group_type",
-        "group_id": int(GROUP_ID),
+        "group_id": group_id,
         "description": DESCRIPTION,
     }, pat)
     runner_token = runner.get("token", "")
@@ -85,7 +103,7 @@ def main() -> None:
         f"--from-literal=runner-token={runner_token}",
         "--dry-run=client", "-o", "yaml",
     ])
-    print(f"Secret '{SECRET_NAME}' créé dans '{RUNNER_NAMESPACE}' avec un nouveau token runner gitlab.com (group {GROUP_ID}).")
+    print(f"Secret '{SECRET_NAME}' créé dans '{RUNNER_NAMESPACE}' avec un nouveau token runner gitlab.com (group {GROUP_PATH}, id {group_id}).")
 
 
 if __name__ == "__main__":
