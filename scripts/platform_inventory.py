@@ -56,7 +56,9 @@ def _normalize_app(app: dict, inventory: dict, pconst: dict) -> dict:
     app = dict(app)
     name = app["name"]
     group = app["group"]
-    gitlab_host = inventory.get("gitlab", {}).get("internalHost", "")
+    gitlab_cfg = inventory.get("gitlab", {})
+    gitlab_base_url = gitlab_cfg.get("baseUrl", "https://gitlab.com")
+    gitlab_root_group = gitlab_cfg.get("rootGroup", "k8s-gitops-lab")
     domain = pconst["domain"]
     registry_host = pconst["registry"]["host"]
 
@@ -77,10 +79,11 @@ def _normalize_app(app: dict, inventory: dict, pconst: dict) -> dict:
     # repoURL (user-facing, external GitLab or source repo) derived if absent
     if "repoURL" not in manifests:
         manifests["repoURL"] = f"https://gitlab.{domain}/{manifests['projectPath']}.git"
-    # argocdRepoURL: in-cluster GitLab URL derived by convention, surchargeable
-    # (ex. migration app par app vers gitlab.com — cf. cockpit/docs/backlog.md).
+    # argocdRepoURL: URL gitlab.com derivee par convention, surchargeable.
     if "argocdRepoURL" not in manifests:
-        manifests["argocdRepoURL"] = f"http://{gitlab_host}/{manifests['projectPath']}.git"
+        manifests["argocdRepoURL"] = (
+            f"{gitlab_base_url}/{gitlab_root_group}/{manifests['projectPath']}.git"
+        )
     if "localPath" not in manifests:
         manifests["localPath"] = f"../{name}-iac"
     if "mainPushAccessLevel" not in manifests:

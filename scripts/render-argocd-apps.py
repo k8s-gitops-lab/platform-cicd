@@ -20,10 +20,12 @@ from platform_inventory import default_apps_file, load_inventory, platform_const
 #   le recopie sous le nom ghcr-pull dans tout namespace portant le label
 #   ci-dessous, pose ici sur les namespaces d'environnement ;
 # - un ExternalSecret par app (genere ci-dessous) fabrique le secret
-#   repository ArgoCD a partir du mot de passe root GitLab.
+#   repository ArgoCD a partir du PAT gitlab.com partage
+#   (flux-secrets/gitlabcom-credentials.yaml, meme secret que consomme le CR
+#   Terraform gitlab-iac-com), via le ClusterSecretStore gitlabcom-secrets.
 _GHCR_PULL_LABEL = "k8s-gitops-lab.io/ghcr-pull"
-_GITLAB_SECRET_STORE = "gitlab-secrets"
-_GITLAB_ROOT_PASSWORD_SECRET = "gitlab-gitlab-initial-root-password"
+_GITLABCOM_SECRET_STORE = "gitlabcom-secrets"
+_GITLABCOM_CREDENTIALS_SECRET = "gitlabcom-credentials"
 
 # Les CR ExternalSecret dependent des CRD posees par l'Application
 # external-secrets : les Applications reessaient jusqu'a convergence.
@@ -68,17 +70,11 @@ def app_data(app: dict) -> dict:
     }
 
 
-def is_local_gitlab_repo(app: dict, gitlab_host: str) -> bool:
-    """Le repo-creds genere ci-dessous suppose le compte root du GitLab local
-    (ClusterSecretStore gitlab-secrets) : ne s'applique qu'aux apps dont
-    argocdRepoURL pointe encore vers l'instance in-cluster. Un app migre
-    vers gitlab.com (argocdRepoURL surcharge, cf. platform_inventory.py) gère
-    son credential ArgoCD manuellement via platform-gitops/flux-secrets/
-    (PAT chiffre SOPS, cf. cockpit/docs/backlog.md)."""
-    return app["manifests"]["argocdRepoURL"].startswith(f"http://{gitlab_host}/")
-
-
 def repo_creds(app: dict) -> dict:
+    """Genere systematiquement le secret repository ArgoCD de l'app pour
+    gitlab.com : ExternalSecret adosse au ClusterSecretStore gitlabcom-secrets
+    (namespace flux-system), authentification oauth2 + PAT partage
+    (flux-secrets/gitlabcom-credentials.yaml)."""
     secret_name = app["manifests"]["argocdSecretName"]
     repo_url = app["manifests"]["argocdRepoURL"]
     return {
@@ -91,7 +87,7 @@ def repo_creds(app: dict) -> dict:
         },
         "spec": {
             "refreshInterval": "1h",
-            "secretStoreRef": {"kind": "ClusterSecretStore", "name": _GITLAB_SECRET_STORE},
+            "secretStoreRef": {"kind": "ClusterSecretStore", "name": _GITLABCOM_SECRET_STORE},
             "target": {
                 "name": secret_name,
                 "creationPolicy": "Owner",
@@ -100,7 +96,7 @@ def repo_creds(app: dict) -> dict:
                     "data": {
                         "type": "git",
                         "url": repo_url,
-                        "username": "root",
+                        "username": "oauth2",
                         "password": "{{ .password }}",
                     },
                 },
@@ -108,7 +104,7 @@ def repo_creds(app: dict) -> dict:
             "data": [
                 {
                     "secretKey": "password",
-                    "remoteRef": {"key": _GITLAB_ROOT_PASSWORD_SECRET, "property": "password"},
+                    "remoteRef": {"key": _GITLABCOM_CREDENTIALS_SECRET, "property": "password"},
                 }
             ],
         },
@@ -264,7 +260,6 @@ def write_yaml(path: Path, docs: dict | list[dict]) -> None:
 def render(apps_file: Path, output_dir: Path, apps_appset_file: Path, app_envs_appset_file: Path) -> None:
     inventory = load_inventory(apps_file)
     pconst = platform_constants(inventory)
-    gitlab_host = inventory.get("gitlab", {}).get("internalHost", "")
 
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -276,10 +271,8 @@ def render(apps_file: Path, output_dir: Path, apps_appset_file: Path, app_envs_a
         app_dir.mkdir()
         write_yaml(app_dir / "app-project.yaml", app_project(app))
         write_yaml(app_dir / "namespaces.yaml", app_namespaces(app))
-        resources = ["app-project.yaml", "namespaces.yaml"]
-        if is_local_gitlab_repo(app, gitlab_host):
-            write_yaml(app_dir / "repo-creds.yaml", repo_creds(app))
-            resources.append("repo-creds.yaml")
+        write_yaml(app_dir / "repo-creds.yaml", repo_creds(app))
+        resources = ["app-project.yaml", "namespaces.yaml", "repo-creds.yaml"]
         # app-data.yaml : pas un manifest, lu directement par app-envs-appset.yaml
         # (git files generator) ; volontairement absent de kustomization.yaml.
         write_yaml(app_dir / "app-data.yaml", app_data(app))
